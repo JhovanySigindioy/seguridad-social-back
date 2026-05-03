@@ -1,0 +1,39 @@
+# Dependencias de Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Variables de entorno (¡Súper importante no subirlas!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Archivos de compilación / Build (si usas TypeScript o Bundlers)
+dist/
+build/
+out/
+.swc/
+
+# Logs del sistema y de la aplicación
+logs
+*.log
+npm-debug.log*
+
+# Cobertura de pruebas (Testing)
+coverage/
+.nyc_output/
+
+# Caché de herramientas
+.eslintcache
+.parcel-cache
+.turbo/
+.node_repl_history
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
