@@ -4,21 +4,22 @@ import logger from '../../../shared/utils/logger.js';
 
 export const createAffiliationController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const agencyId = req.user?.agencyId;
-    const userId = req.user?.id;
-    
+    const user = (req as any).user;
+    const agencyId = Number(user?.agency_id);
+    const userId = Number(user?.id);
+
     if (!agencyId || !userId) {
-      throw Object.assign(new Error('Sesión inválida'), { status: 401 });
+      throw Object.assign(new Error('Sesion invalida'), { status: 401 });
     }
 
     const newAffiliation = await createAffiliationService(req.body, userId, agencyId);
-    
-    logger.info('✅ Nueva afiliación creada:', { id: newAffiliation.id, by: userId });
+
+    logger.info('Nueva afiliacion creada:', { id: newAffiliation.id, by: userId });
 
     res.status(201).json({
       success: true,
       data: newAffiliation,
-      message: 'Afiliación creada exitosamente'
+      message: 'Afiliacion creada exitosamente',
     });
   } catch (error) {
     next(error);

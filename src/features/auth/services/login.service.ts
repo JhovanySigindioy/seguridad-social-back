@@ -27,14 +27,12 @@ export class LoginService {
     let officeIds: number[] = [];
 
     if (user.role === ADMIN_ROLE) {
-      // Admin: devolver todas las sedes de su agencia
       const [allOffices]: any = await pool.query(
         'SELECT id FROM offices WHERE agency_id = ? AND is_active = 1',
         [user.agency_id]
       );
       officeIds = allOffices.map((o: any) => o.id);
     } else {
-      // Otros roles: solo las sedes asignadas
       const [offices]: any = await pool.query(
         'SELECT office_id FROM user_offices WHERE user_id = ?',
         [user.id]

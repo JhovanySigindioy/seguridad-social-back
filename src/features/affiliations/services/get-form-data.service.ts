@@ -1,23 +1,39 @@
 import db from '../../../config/database.js';
 
 export const getFormDataService = async (agencyId: number) => {
-  const [eps] = await db.query('SELECT id, name FROM eps_list');
-  const [arl] = await db.query('SELECT id, name FROM arl_list');
-  const [ccf] = await db.query('SELECT id, name FROM ccf_list');
-  const [pensions] = await db.query('SELECT id, name FROM pension_fund_list');
-  
-  // Clientes activos de la agencia con sus empresas vinculadas
-  const [clientEmployers] = await db.query(`
-    SELECT 
-      ce.id as client_employer_id,
-      c.identification,
-      c.full_name as client_name,
-      co.name as company_name
-    FROM client_employers ce
-    INNER JOIN clients c ON ce.client_id = c.id
-    INNER JOIN companies co ON ce.company_id = co.id
-    WHERE ce.is_active = 1 AND co.agency_id = ?
-  `, [agencyId]);
+  const [clients] = await db.query<any[]>(
+    `SELECT 
+       c.id,
+       c.first_name,
+       c.second_name,
+       c.first_lastname,
+       c.second_lastname,
+       c.identification,
+       c.email,
+       o.name AS office_name
+     FROM clients c
+       LEFT JOIN offices o ON o.id = c.office_id
+     WHERE o.agency_id = ? OR o.agency_id IS NULL
+     ORDER BY c.first_name ASC, c.first_lastname ASC`,
+    [agencyId]
+  );
 
-  return { eps, arl, ccf, pensions, clientEmployers };
+  const [companies] = await db.query<any[]>(
+    `SELECT id, name FROM companies WHERE agency_id = ? AND is_active = 1 ORDER BY name ASC`,
+    [agencyId]
+  );
+
+  const [eps] = await db.query<any[]>('SELECT id, name FROM eps_list ORDER BY name ASC');
+  const [arl] = await db.query<any[]>('SELECT id, name FROM arl_list ORDER BY name ASC');
+  const [ccf] = await db.query<any[]>('SELECT id, name FROM ccf_list ORDER BY name ASC');
+  const [pensions] = await db.query<any[]>('SELECT id, name FROM pension_fund_list ORDER BY name ASC');
+
+  return {
+    clients,
+    companies,
+    eps,
+    arl,
+    ccf,
+    pensions,
+  };
 };

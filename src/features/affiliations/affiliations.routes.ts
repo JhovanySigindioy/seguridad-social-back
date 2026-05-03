@@ -3,6 +3,8 @@ import { authMiddleware } from '../../middleware/auth.middleware.js';
 import { getAffiliationsController } from './controllers/get-affiliations.controller.js';
 import { getFormDataController } from './controllers/get-form-data.controller.js';
 import { createAffiliationController } from './controllers/create-affiliation.controller.js';
+import { updateAffiliationController } from './controllers/update-affiliation.controller.js';
+import { updateAffiliationStatusController } from './controllers/update-affiliation-status.controller.js';
 
 const router = Router();
 
@@ -10,6 +12,8 @@ router.use(authMiddleware);
 
 router.get('/', getAffiliationsController);
 router.get('/form-data', getFormDataController);
+router.put('/:id', updateAffiliationController);
+router.patch('/:id/status', updateAffiliationStatusController);
 router.post('/', createAffiliationController);
 
 export default router;

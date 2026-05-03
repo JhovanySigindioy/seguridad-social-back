@@ -9,9 +9,11 @@ export class GetAffiliationsService {
     const [rows]: any = await pool.query(
       `SELECT
         ma.id,
-        c.full_name        AS client_name,
+        ce.client_id,
+        CONCAT_WS(' ', c.first_name, c.second_name, c.first_lastname, c.second_lastname) AS client_name,
         c.identification   AS client_identification,
         co.name            AS company_name,
+        co.id              AS company_id,
         ma.month,
         ma.year,
         ma.value,
@@ -21,6 +23,7 @@ export class GetAffiliationsService {
         COALESCE(p.name, '—')  AS pension_name,
         ma.risk_level,
         ma.payment_status,
+        ma.created_at,
         ma.gov_record_at,
         ma.is_auto_renewed
       FROM monthly_affiliations ma
@@ -32,7 +35,7 @@ export class GetAffiliationsService {
         LEFT  JOIN ccf_list         cc ON cc.id = ma.ccf_id
         LEFT  JOIN pension_fund_list p ON p.id  = ma.pension_id
       WHERE co.agency_id = ?
-      ORDER BY ma.year DESC, ma.month DESC, ma.id DESC
+      ORDER BY ma.gov_record_at DESC, ma.id DESC
       LIMIT 200`,
       [agencyId]
     );

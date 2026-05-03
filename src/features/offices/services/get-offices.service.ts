@@ -6,6 +6,7 @@ export class GetOfficesService {
       'SELECT id, name, address, is_active FROM offices WHERE agency_id = ?',
       [agencyId]
     );
+
     return offices;
   }
 }
