@@ -5,6 +5,7 @@ import { getFormDataController } from './controllers/get-form-data.controller.js
 import { createAffiliationController } from './controllers/create-affiliation.controller.js';
 import { updateAffiliationController } from './controllers/update-affiliation.controller.js';
 import { updateAffiliationStatusController } from './controllers/update-affiliation-status.controller.js';
+import { closeAffiliationController } from './controllers/close-affiliation.controller.js';
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.get('/', getAffiliationsController);
 router.get('/form-data', getFormDataController);
 router.put('/:id', updateAffiliationController);
 router.patch('/:id/status', updateAffiliationStatusController);
+router.patch('/:id/close', closeAffiliationController);
 router.post('/', createAffiliationController);
 
 export default router;
