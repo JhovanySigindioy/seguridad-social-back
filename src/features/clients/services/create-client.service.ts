@@ -15,8 +15,8 @@ export class CreateClientService {
     try {
       const [result]: any = await db.query(
         `INSERT INTO clients 
-         (document_type_id, first_name, second_name, first_lastname, second_lastname, identification, email, office_id) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (document_type_id, first_name, second_name, first_lastname, second_lastname, identification, email, phone_1, phone_2, office_id) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dto.document_type_id,
           dto.first_name,
@@ -25,6 +25,8 @@ export class CreateClientService {
           dto.second_lastname || null,
           dto.identification,
           dto.email || null,
+          dto.phone_1 || null,
+          dto.phone_2 || null,
           dto.office_id,
         ]
       );
@@ -36,6 +38,7 @@ export class CreateClientService {
           c.id, c.document_type_id, dt.name AS document_type_name,
           c.identification, c.first_name, c.second_name,
           c.first_lastname, c.second_lastname, c.email,
+          c.phone_1, c.phone_2,
           c.office_id, o.name AS office_name, c.created_at
          FROM clients c
          INNER JOIN document_types dt ON dt.id = c.document_type_id
@@ -56,6 +59,8 @@ export class CreateClientService {
         second_lastname: row.second_lastname,
         full_name: `${row.first_name}${row.second_name ? ' ' + row.second_name : ''} ${row.first_lastname}${row.second_lastname ? ' ' + row.second_lastname : ''}`.trim(),
         email: row.email,
+        phone_1: row.phone_1,
+        phone_2: row.phone_2,
         office_id: row.office_id,
         office_name: row.office_name,
         created_at: row.created_at,

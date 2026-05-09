@@ -32,11 +32,13 @@ export class GetAffiliationsService {
         ma.gov_record_at,
         ma.is_auto_renewed,
         ma.observation,
-        ma.withdrawal_reason
+        ma.withdrawal_reason,
+        o.name             AS office_name
       FROM monthly_affiliations ma
         INNER JOIN client_employers ce ON ce.id = ma.client_employer_id
         INNER JOIN clients          c  ON c.id  = ce.client_id
         INNER JOIN companies        co ON co.id = ce.company_id
+        INNER JOIN offices          o  ON o.id  = c.office_id
         LEFT  JOIN eps_list         e  ON e.id  = ma.eps_id
         LEFT  JOIN arl_list         a  ON a.id  = ma.arl_id
         LEFT  JOIN ccf_list         cc ON cc.id = ma.ccf_id
@@ -79,11 +81,13 @@ export class GetAffiliationsService {
         ma.gov_record_at,
         ma.is_auto_renewed,
         ma.observation,
-        ma.withdrawal_reason
+        ma.withdrawal_reason,
+        o.name             AS office_name
       FROM monthly_affiliations ma
         INNER JOIN client_employers ce ON ce.id = ma.client_employer_id
         INNER JOIN clients          c  ON c.id  = ce.client_id
         INNER JOIN companies        co ON co.id = ce.company_id
+        INNER JOIN offices          o  ON o.id  = c.office_id
         LEFT  JOIN eps_list         e  ON e.id  = ma.eps_id
         LEFT  JOIN arl_list         a  ON a.id  = ma.arl_id
         LEFT  JOIN ccf_list         cc ON cc.id = ma.ccf_id

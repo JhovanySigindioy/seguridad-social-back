@@ -11,6 +11,8 @@ const createClientSchema = z.object({
   second_lastname: z.string().optional(),
   identification: z.string().min(4),
   email: z.string().email().optional().or(z.literal('')),
+  phone_1: z.string().optional().or(z.literal('')),
+  phone_2: z.string().optional().or(z.literal('')),
   office_id: z.number().positive(),
 });
 

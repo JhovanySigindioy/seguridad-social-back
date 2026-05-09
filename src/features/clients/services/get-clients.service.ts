@@ -14,6 +14,8 @@ export class GetClientsService {
         c.first_lastname,
         c.second_lastname,
         c.email,
+        c.phone_1,
+        c.phone_2,
         c.office_id,
         o.name AS office_name,
         c.created_at
@@ -45,6 +47,8 @@ export class GetClientsService {
       second_lastname: row.second_lastname,
       full_name: `${row.first_name}${row.second_name ? ' ' + row.second_name : ''} ${row.first_lastname}${row.second_lastname ? ' ' + row.second_lastname : ''}`.trim(),
       email: row.email,
+      phone_1: row.phone_1,
+      phone_2: row.phone_2,
       office_id: row.office_id,
       office_name: row.office_name,
       created_at: row.created_at,
