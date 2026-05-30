@@ -6,11 +6,13 @@ import { createAffiliationController } from './controllers/create-affiliation.co
 import { updateAffiliationController } from './controllers/update-affiliation.controller.js';
 import { updateAffiliationStatusController } from './controllers/update-affiliation-status.controller.js';
 import { closeAffiliationController } from './controllers/close-affiliation.controller.js';
+import { getLatestByClientController } from './controllers/get-latest-by-client.controller.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
+router.get('/latest-by-client/:clientId', getLatestByClientController);
 router.get('/', getAffiliationsController);
 router.get('/form-data', getFormDataController);
 router.put('/:id', updateAffiliationController);

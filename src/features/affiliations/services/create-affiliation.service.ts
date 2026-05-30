@@ -5,7 +5,7 @@ interface CreateAffiliationDTO {
   client_id: number;
   company_id: number;
   start_date: string;
-  end_date?: string;
+  end_date: string; // Hecho obligatorio
   value: number;
   payment_method?: 'Efectivo' | 'Transferencia' | 'Nequi' | 'Daviplata' | 'Otro';
   eps_id?: number | null;
@@ -50,12 +50,28 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
 
   if (existingClientEmployer.length > 0) {
     clientEmployerId = existingClientEmployer[0].id;
+
+    // VALIDACIÓN: Verificar si ya existe una afiliación ACTIVA para este client_employer
+    const [existingActive]: any = await db.query(
+      `SELECT id FROM affiliations 
+       WHERE client_employer_id = ? AND status = 'Activo' 
+       LIMIT 1`,
+      [clientEmployerId]
+    );
+
+    if (existingActive.length > 0) {
+      throw Object.assign(new Error('Este cliente ya tiene una afiliación activa con esta empresa.'), { status: 400 });
+    }
   } else {
     const [result]: any = await db.query(
       `INSERT INTO client_employers (client_id, company_id, office_id, is_active, start_date) VALUES (?, ?, ?, 1, CURDATE())`,
       [data.client_id, data.company_id, clientOfficeId]
     );
     clientEmployerId = result.insertId;
+  }
+
+  if (!data.end_date) {
+    throw Object.assign(new Error('La fecha de fin es obligatoria.'), { status: 400 });
   }
 
   const startDateObj = new Date(data.start_date);
@@ -78,36 +94,59 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
   }
 
   try {
-    const [result]: any = await db.query(
-      `INSERT INTO monthly_affiliations (
-         client_employer_id, start_date, end_date, status,
-         month, year, days_worked, value,
-         payment_status, payment_method, eps_id, arl_id, ccf_id, pension_id,
-         risk_level, is_auto_renewed, created_by, observation
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        clientEmployerId,
-        data.start_date,
-        data.end_date || null,
-        data.end_date ? 'Inactivo' : 'Activo',
-        month,
-        year,
-        daysWorked,
-        data.value,
-        'Pendiente',
-        data.payment_method || null,
-        data.eps_id || null,
-        data.arl_id || null,
-        data.ccf_id || null,
-        data.pension_id || null,
-        data.risk_level || null,
-        data.is_auto_renewed ? 1 : 0,
-        createdBy,
-        data.observation || null,
-      ]
-    );
+    const connection = await db.getConnection();
+    await connection.beginTransaction();
 
-    return { id: result.insertId };
+    try {
+      const [result]: any = await connection.query(
+        `INSERT INTO affiliations (
+           client_employer_id, start_date, end_date, status,
+           days_worked, eps_id, arl_id, ccf_id, pension_id,
+           risk_level, created_by, observation
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          clientEmployerId,
+          data.start_date,
+          data.end_date,
+          'Activo',
+          daysWorked,
+          data.eps_id || null,
+          data.arl_id || null,
+          data.ccf_id || null,
+          data.pension_id || null,
+          data.risk_level || null,
+          createdBy,
+          data.observation || null,
+        ]
+      );
+
+      const affiliationId = result.insertId;
+
+      await connection.query(
+        `INSERT INTO monthly_payments (
+           affiliation_id, month, year, value,
+           payment_status, payment_method, is_auto_renewed, created_by
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          affiliationId,
+          month,
+          year,
+          data.value,
+          'Pendiente',
+          data.payment_method || null,
+          data.is_auto_renewed ? 1 : 0,
+          createdBy
+        ]
+      );
+
+      await connection.commit();
+      connection.release();
+      return { id: affiliationId };
+    } catch (error: any) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (error: any) {
     if (error.errno === 1062) {
       if (error.sqlMessage?.includes('uk_affiliation_client_start')) {
@@ -133,11 +172,11 @@ export const closeAffiliationService = async (
   agencyId: number
 ) => {
   const [existing]: any = await db.query(`
-    SELECT ma.id, ma.client_employer_id, ma.status
-    FROM monthly_affiliations ma
-    INNER JOIN client_employers ce ON ce.id = ma.client_employer_id
+    SELECT a.id, a.client_employer_id, a.status
+    FROM affiliations a
+    INNER JOIN client_employers ce ON ce.id = a.client_employer_id
     INNER JOIN companies co ON co.id = ce.company_id
-    WHERE ma.id = ? AND co.agency_id = ?
+    WHERE a.id = ? AND co.agency_id = ?
   `, [affiliationId, agencyId]);
 
   if (!existing.length) {
@@ -158,7 +197,7 @@ export const closeAffiliationService = async (
   );
 
   await db.query(`
-    UPDATE monthly_affiliations SET
+    UPDATE affiliations SET
       end_date = ?,
       status = 'Inactivo',
       days_worked = ?,

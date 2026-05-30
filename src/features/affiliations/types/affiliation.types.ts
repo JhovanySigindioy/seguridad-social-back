@@ -1,4 +1,4 @@
-export const PAYMENT_STATUSES = ['Pendiente', 'En Proceso', 'Pagado'] as const;
+export const PAYMENT_STATUSES = ['Pendiente', 'En Proceso', 'Pagado', 'Sin Recibo'] as const;
 export type PaymentStatus = typeof PAYMENT_STATUSES[number];
 
 export const AFFILIATION_STATUSES = ['Activo', 'Inactivo'] as const;

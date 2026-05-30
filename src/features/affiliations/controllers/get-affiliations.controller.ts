@@ -1,16 +1,22 @@
-import type { Request, Response } from 'express';
 import { GetAffiliationsService } from '../services/get-affiliations.service.js';
-import { sendError, sendSuccess } from '../../../shared/utils/api-response.js';
+import { sendSuccess } from '../../../shared/utils/api-response.js';
+import { asyncHandler } from '../../../middleware/asyncHandler.js';
+import type { AuthRequest } from '../../../types/express.types.js';
 
 const service = new GetAffiliationsService();
 
-export const getAffiliationsController = async (req: Request, res: Response) => {
-  try {
-    const agencyId = (req as any).user.agency_id;
-    const data = await service.execute(agencyId);
+export const getAffiliationsController = asyncHandler(async (req, res) => {
+  const { agency_id } = (req as AuthRequest).user;
+  const { month, year } = req.query;
 
-    return sendSuccess(res, data);
-  } catch (err: any) {
-    return sendError(res, err.message, 500);
-  }
-};
+  const parsedMonth = month ? parseInt(month as string, 10) : undefined;
+  const parsedYear = year ? parseInt(year as string, 10) : undefined;
+
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  const data = await service.execute(agency_id, parsedMonth, parsedYear);
+
+  return sendSuccess(res, data);
+});

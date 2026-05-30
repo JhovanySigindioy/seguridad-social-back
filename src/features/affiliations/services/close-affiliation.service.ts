@@ -15,11 +15,11 @@ export class CloseAffiliationService {
     agencyId,
   }: CloseAffiliationDTO) {
     const [existing]: any = await db.query(`
-      SELECT ma.id, ma.client_employer_id, ma.status, ma.start_date
-      FROM monthly_affiliations ma
-      INNER JOIN client_employers ce ON ce.id = ma.client_employer_id
+      SELECT a.id, a.client_employer_id, a.status, a.start_date
+      FROM affiliations a
+      INNER JOIN client_employers ce ON ce.id = a.client_employer_id
       INNER JOIN companies co ON co.id = ce.company_id
-      WHERE ma.id = ? AND co.agency_id = ?
+      WHERE a.id = ? AND co.agency_id = ?
     `, [affiliationId, agencyId]);
 
     if (!existing.length) {
@@ -42,7 +42,7 @@ export class CloseAffiliationService {
     const endDate = today.toISOString().split('T')[0];
 
     await db.query(`
-      UPDATE monthly_affiliations SET
+      UPDATE affiliations SET
         end_date = ?,
         status = 'Inactivo',
         days_worked = ?,

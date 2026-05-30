@@ -1,5 +1,5 @@
 import express from 'express';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
@@ -33,21 +33,8 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ success: true, data: { status: 'vibe-coding-active', timestamp: new Date() }, error: null });
 });
 
-app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-  logger.error('Error detectado:', {
-    message: err.message,
-    stack: err.stack,
-    path: req.path,
-    method: req.method,
-  });
-
-  res.status(err.status || 500).json({
-    success: false,
-    data: null,
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
-  });
-});
-
+// Único error handler global — maneja MySQL, JWT, Zod y errores genéricos
 app.use(globalErrorHandler);
+
 
 export default app;

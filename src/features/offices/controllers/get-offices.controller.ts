@@ -1,15 +1,12 @@
-import type { Request, Response } from 'express';
 import { GetOfficesService } from '../services/get-offices.service.js';
-import { sendError, sendSuccess } from '../../../shared/utils/api-response.js';
+import { sendSuccess } from '../../../shared/utils/api-response.js';
+import { asyncHandler } from '../../../middleware/asyncHandler.js';
+import type { AuthRequest } from '../../../types/express.types.js';
 
-export const getOfficesController = async (req: Request, res: Response) => {
-  try {
-    const agencyId = (req as any).user.agency_id;
-    const getOfficesService = new GetOfficesService();
-    const offices = await getOfficesService.execute(agencyId);
+export const getOfficesController = asyncHandler(async (req, res) => {
+  const { agency_id } = (req as AuthRequest).user;
+  const getOfficesService = new GetOfficesService();
+  const offices = await getOfficesService.execute(agency_id);
 
-    return sendSuccess(res, offices);
-  } catch (error: any) {
-    return sendError(res, 'Error al obtener las sedes');
-  }
-};
+  return sendSuccess(res, offices);
+});

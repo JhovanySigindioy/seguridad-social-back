@@ -2,6 +2,7 @@ import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../../../config/database.js';
 import logger from '../../../shared/utils/logger.js';
+import { env } from '../../../config/env.js';
 import type { LoginResponse } from '../types/auth.types.js';
 
 const ADMIN_ROLE = 'admin';
@@ -44,7 +45,7 @@ export class LoginService {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, agency_id: user.agency_id },
-      process.env.JWT_SECRET || 'secret',
+      env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 

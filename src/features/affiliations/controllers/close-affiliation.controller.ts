@@ -1,7 +1,8 @@
-import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { sendError, sendSuccess } from '../../../shared/utils/api-response.js';
+import { sendSuccess } from '../../../shared/utils/api-response.js';
+import { asyncHandler } from '../../../middleware/asyncHandler.js';
 import { CloseAffiliationService } from '../services/close-affiliation.service.js';
+import type { AuthRequest } from '../../../types/express.types.js';
 
 const paramsSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -14,29 +15,17 @@ const bodySchema = z.object({
 
 const service = new CloseAffiliationService();
 
-export const closeAffiliationController = async (req: Request, res: Response) => {
-  try {
-    const { id } = paramsSchema.parse(req.params);
-    const { withdrawal_reason, withdrawal_observations } = bodySchema.parse(req.body);
-    const user = (req as any).user;
+export const closeAffiliationController = asyncHandler(async (req, res) => {
+  const { id } = paramsSchema.parse(req.params);
+  const { withdrawal_reason, withdrawal_observations } = bodySchema.parse(req.body);
+  const { agency_id } = (req as AuthRequest).user;
 
-    if (!user?.agency_id) {
-      return sendError(res, 'Sesion invalida', 401);
-    }
+  const data = await service.execute({
+    affiliationId: id,
+    withdrawalReason: withdrawal_reason,
+    withdrawalObservations: withdrawal_observations ?? undefined,
+    agencyId: agency_id,
+  });
 
-    const data = await service.execute({
-      affiliationId: id,
-      withdrawalReason: withdrawal_reason,
-      withdrawalObservations: withdrawal_observations ?? undefined,
-      agencyId: Number(user.agency_id),
-    });
-
-    return sendSuccess(res, data);
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return sendError(res, 'Datos invalidos para cerrar afiliación', 400);
-    }
-
-    return sendError(res, error.message || 'Error al cerrar la afiliación', error.status || 500);
-  }
-};
+  return sendSuccess(res, data);
+});

@@ -1,8 +1,8 @@
+// env se importa primero para validar variables de entorno antes de arrancar
+import { env } from './config/env.js';
 import app from './app.js';
 import logger from './shared/utils/logger.js';
 
-const PORT = Number(process.env.PORT || 3001);
-
-app.listen(PORT, () => {
-  logger.info(`Servidor escuchando en puerto ${PORT}`);
+app.listen(env.PORT, () => {
+  logger.info(`Servidor escuchando en puerto ${env.PORT} [${env.NODE_ENV}]`);
 });
