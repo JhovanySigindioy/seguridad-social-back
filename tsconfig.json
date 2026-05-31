@@ -17,5 +17,10 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-  }
+  },
+  "exclude": [
+    "migrate.ts",
+    "node_modules",
+    "dist"
+  ]
 }
