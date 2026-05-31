@@ -6,6 +6,7 @@ export interface LoginResponse {
     email: string;
     role: string;
     agency_id: number;
+    agency_logo_url?: string | null;
   };
   offices: number[];
 }

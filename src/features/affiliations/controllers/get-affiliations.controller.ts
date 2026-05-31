@@ -6,7 +6,7 @@ import type { AuthRequest } from '../../../types/express.types.js';
 const service = new GetAffiliationsService();
 
 export const getAffiliationsController = asyncHandler(async (req, res) => {
-  const { agency_id } = (req as AuthRequest).user;
+  const { agency_id, id: userId, role } = (req as AuthRequest).user;
   const { month, year } = req.query;
 
   const parsedMonth = month ? parseInt(month as string, 10) : undefined;
@@ -16,7 +16,7 @@ export const getAffiliationsController = asyncHandler(async (req, res) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
-  const data = await service.execute(agency_id, parsedMonth, parsedYear);
+  const data = await service.execute(agency_id, userId, role, parsedMonth, parsedYear);
 
   return sendSuccess(res, data);
 });

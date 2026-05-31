@@ -10,7 +10,10 @@ const ADMIN_ROLE = 'admin';
 export class LoginService {
   async execute(email: string, password: string): Promise<LoginResponse | null> {
     const [users]: any = await pool.query(
-      'SELECT id, name, email, password, role, agency_id FROM users WHERE email = ? AND is_active = 1',
+      `SELECT u.id, u.name, u.email, u.password, u.role, u.agency_id, a.logo_url AS agency_logo_url
+       FROM users u
+       JOIN agencies a ON a.id = u.agency_id
+       WHERE u.email = ? AND u.is_active = 1`,
       [email]
     );
 
@@ -57,6 +60,7 @@ export class LoginService {
         email: user.email,
         role: user.role,
         agency_id: user.agency_id,
+        agency_logo_url: user.agency_logo_url,
       },
       offices: officeIds,
     };

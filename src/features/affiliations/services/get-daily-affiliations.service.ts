@@ -33,16 +33,23 @@ interface DailyAffiliationItem {
 export class GetDailyAffiliationsService {
   async execute(
     agencyId: number,
+    userId: number,
+    role: string,
     date: string,
     officeId?: number
   ): Promise<{ items: DailyAffiliationItem[] }> {
-    logger.info('Fetching daily affiliations', { agencyId, date, officeId });
+    logger.info('Fetching daily affiliations', { agencyId, userId, role, date, officeId });
 
-    const conditions = ['co.agency_id = ?', 'DATE(a.created_at) = ?'];
+    const conditions = ['co.agency_id = ?', 'DATE(lp.created_at) = ?'];
     const params: any[] = [agencyId, date];
 
+    if (role !== 'admin') {
+      conditions.push('ce.office_id IN (SELECT office_id FROM user_offices WHERE user_id = ?)');
+      params.push(userId);
+    }
+
     if (officeId) {
-      conditions.push('c.office_id = ?');
+      conditions.push('ce.office_id = ?');
       params.push(officeId);
     }
 
@@ -81,19 +88,14 @@ export class GetDailyAffiliationsService {
         INNER JOIN client_employers ce ON ce.id = a.client_employer_id
         INNER JOIN clients c ON c.id = ce.client_id
         INNER JOIN companies co ON co.id = ce.company_id
-        INNER JOIN offices o ON o.id = c.office_id
+        INNER JOIN offices o ON o.id = ce.office_id
         LEFT JOIN eps_list e ON e.id = a.eps_id
         LEFT JOIN arl_list ar ON ar.id = a.arl_id
         LEFT JOIN ccf_list cc ON cc.id = a.ccf_id
         LEFT JOIN pension_fund_list p ON p.id = a.pension_id
-        LEFT JOIN monthly_payments lp ON lp.affiliation_id = a.id
-          AND (lp.year, lp.month) = (
-            SELECT year, month FROM monthly_payments
-            WHERE affiliation_id = a.id
-            ORDER BY year DESC, month DESC LIMIT 1
-          )
+        INNER JOIN monthly_payments lp ON lp.affiliation_id = a.id
       WHERE ${conditions.join(' AND ')}
-      ORDER BY o.name, a.created_at DESC`;
+      ORDER BY o.name, lp.created_at DESC`;
 
     const [rows] = await pool.query(sql, params);
     return { items: rows as DailyAffiliationItem[] };

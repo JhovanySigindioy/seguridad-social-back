@@ -4,6 +4,7 @@ import { validateNewAffiliation, AffiliationOverlapValidator } from './affiliati
 interface CreateAffiliationDTO {
   client_id: number;
   company_id: number;
+  office_id?: number;
   start_date: string;
   end_date: string; // Hecho obligatorio
   value: number;
@@ -63,9 +64,11 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
       throw Object.assign(new Error('Este cliente ya tiene una afiliación activa con esta empresa.'), { status: 400 });
     }
   } else {
+    const targetOfficeId = data.office_id || clientOfficeId;
+
     const [result]: any = await db.query(
       `INSERT INTO client_employers (client_id, company_id, office_id, is_active, start_date) VALUES (?, ?, ?, 1, CURDATE())`,
-      [data.client_id, data.company_id, clientOfficeId]
+      [data.client_id, data.company_id, targetOfficeId]
     );
     clientEmployerId = result.insertId;
   }

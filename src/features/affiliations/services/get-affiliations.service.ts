@@ -3,13 +3,18 @@ import logger from '../../../shared/utils/logger.js';
 import type { AffiliationListResponse } from '../types/affiliation.types.js';
 
 export class GetAffiliationsService {
-  async execute(agencyId: number, month?: number, year?: number): Promise<AffiliationListResponse> {
-    logger.info('Fetching affiliations', { agencyId, month, year });
+  async execute(agencyId: number, userId: number, role: string, month?: number, year?: number): Promise<AffiliationListResponse> {
+    logger.info('Fetching affiliations', { agencyId, userId, role, month, year });
 
     const params: any[] = [];
     let paymentJoinCondition = 'mp.affiliation_id = a.id';
     const conditions = ['co.agency_id = ?'];
     params.push(agencyId);
+
+    if (role !== 'admin') {
+      conditions.push('ce.office_id IN (SELECT office_id FROM user_offices WHERE user_id = ?)');
+      params.push(userId);
+    }
 
     if (month && year) {
       const m = Number(month);
@@ -27,6 +32,12 @@ export class GetAffiliationsService {
       // If end_date is null, it's active. If not, the month it ends must be >= target month
       conditions.push(`(a.end_date IS NULL OR (YEAR(a.end_date) * 12 + MONTH(a.end_date)) >= ?)`);
       params.push(targetMonths);
+    } else {
+      paymentJoinCondition = `mp.affiliation_id = a.id AND (mp.year, mp.month) = (
+        SELECT year, month FROM monthly_payments 
+        WHERE affiliation_id = a.id 
+        ORDER BY year DESC, month DESC LIMIT 1
+      )`;
     }
 
     logger.debug('Executing query', { sqlParams: params });
@@ -53,6 +64,7 @@ export class GetAffiliationsService {
         COALESCE(mp.payment_status, 'Pendiente') AS payment_status,
         mp.payment_method,
         a.created_at,
+        mp.created_at AS payment_created_at,
         mp.gov_record_at,
         COALESCE(mp.value, (
           SELECT value FROM monthly_payments 
@@ -67,7 +79,7 @@ export class GetAffiliationsService {
         INNER JOIN client_employers ce ON ce.id = a.client_employer_id
         INNER JOIN clients          c  ON c.id  = ce.client_id
         INNER JOIN companies        co ON co.id = ce.company_id
-        INNER JOIN offices          o  ON o.id  = c.office_id
+        INNER JOIN offices          o  ON o.id  = ce.office_id
         LEFT  JOIN eps_list         e  ON e.id  = a.eps_id
         LEFT  JOIN arl_list         ar ON ar.id = a.arl_id
         LEFT  JOIN ccf_list         cc ON cc.id = a.ccf_id
@@ -123,7 +135,7 @@ export class GetAffiliationsService {
         INNER JOIN client_employers ce ON ce.id = a.client_employer_id
         INNER JOIN clients          c  ON c.id  = ce.client_id
         INNER JOIN companies        co ON co.id = ce.company_id
-        INNER JOIN offices          o  ON o.id  = c.office_id
+        INNER JOIN offices          o  ON o.id  = ce.office_id
         LEFT  JOIN eps_list         e  ON e.id  = a.eps_id
         LEFT  JOIN arl_list         ar ON ar.id = a.arl_id
         LEFT  JOIN ccf_list         cc ON cc.id = a.ccf_id
