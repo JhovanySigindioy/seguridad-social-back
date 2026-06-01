@@ -35,12 +35,7 @@ export class AffiliationOverlapValidator {
       };
     }
 
-    if (parsedStartDate > new Date()) {
-      return {
-        valid: false,
-        error: 'La fecha de inicio no puede ser futura.',
-      };
-    }
+
 
     const lastAffiliation = await this.getLastAffiliation(client_employer_id);
 
