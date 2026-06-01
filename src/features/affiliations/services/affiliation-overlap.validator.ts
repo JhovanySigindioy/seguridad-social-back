@@ -86,10 +86,8 @@ export class AffiliationOverlapValidator {
         id,
         start_date,
         end_date,
-        status,
-        month,
-        year
-      FROM monthly_affiliations
+        status
+      FROM affiliations
       WHERE client_employer_id = ?
         AND status = 'Activo'
     `;
@@ -119,10 +117,8 @@ export class AffiliationOverlapValidator {
         id,
         start_date,
         end_date,
-        status,
-        month,
-        year
-      FROM monthly_affiliations
+        status
+      FROM affiliations
       WHERE client_employer_id = ?
       ORDER BY start_date DESC
       LIMIT 1

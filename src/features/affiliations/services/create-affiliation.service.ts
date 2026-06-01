@@ -43,29 +43,22 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
   }
 
   let [existingClientEmployer]: any = await db.query(
-    `SELECT id FROM client_employers WHERE client_id = ? AND company_id = ? AND is_active = 1`,
+    `SELECT id, office_id FROM client_employers WHERE client_id = ? AND company_id = ? AND is_active = 1`,
     [data.client_id, data.company_id]
   );
 
   let clientEmployerId: number;
 
+  const targetOfficeId = data.office_id || clientOfficeId;
+
   if (existingClientEmployer.length > 0) {
     clientEmployerId = existingClientEmployer[0].id;
-
-    // VALIDACIÓN: Verificar si ya existe una afiliación ACTIVA para este client_employer
-    const [existingActive]: any = await db.query(
-      `SELECT id FROM affiliations 
-       WHERE client_employer_id = ? AND status = 'Activo' 
-       LIMIT 1`,
-      [clientEmployerId]
-    );
-
-    if (existingActive.length > 0) {
-      throw Object.assign(new Error('Este cliente ya tiene una afiliación activa con esta empresa.'), { status: 400 });
+    
+    // Si la oficina cambió (ej. el cliente volvió a afiliarse pero en otra oficina), actualizamos el registro
+    if (existingClientEmployer[0].office_id !== targetOfficeId) {
+      await db.query(`UPDATE client_employers SET office_id = ? WHERE id = ?`, [targetOfficeId, clientEmployerId]);
     }
   } else {
-    const targetOfficeId = data.office_id || clientOfficeId;
-
     const [result]: any = await db.query(
       `INSERT INTO client_employers (client_id, company_id, office_id, is_active, start_date) VALUES (?, ?, ?, 1, CURDATE())`,
       [data.client_id, data.company_id, targetOfficeId]
@@ -77,9 +70,9 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
     throw Object.assign(new Error('La fecha de fin es obligatoria.'), { status: 400 });
   }
 
-  const startDateObj = new Date(data.start_date);
-  const month = startDateObj.getMonth() + 1;
-  const year = startDateObj.getFullYear();
+  const [yearStr, monthStr] = (data.start_date || '').split('-');
+  const month = parseInt(monthStr || '0', 10);
+  const year = parseInt(yearStr || '0', 10);
 
   const validator = new AffiliationOverlapValidator(agencyId);
   const daysWorked = validator.calculateDaysWorked(data.start_date, data.end_date || null);

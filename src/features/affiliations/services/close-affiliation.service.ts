@@ -2,6 +2,7 @@ import db from '../../../config/database.js';
 
 interface CloseAffiliationDTO {
   affiliationId: number;
+  endDate: string;
   withdrawalReason: string;
   withdrawalObservations?: string | undefined;
   agencyId: number;
@@ -10,6 +11,7 @@ interface CloseAffiliationDTO {
 export class CloseAffiliationService {
   async execute({
     affiliationId,
+    endDate,
     withdrawalReason,
     withdrawalObservations,
     agencyId,
@@ -26,25 +28,19 @@ export class CloseAffiliationService {
       throw Object.assign(new Error('Afiliación no encontrada'), { status: 404 });
     }
 
-    if (existing[0].status === 'Inactivo') {
-      throw Object.assign(
-        new Error('Esta afiliación ya se encuentra cerrada.'),
-        { status: 400 }
-      );
+    const startDate = new Date(existing[0].start_date);
+    const selectedEndDate = new Date(endDate);
+    selectedEndDate.setHours(23, 59, 59, 999);
+
+    if (selectedEndDate < startDate) {
+      throw Object.assign(new Error('La fecha de fin no puede ser menor a la fecha de inicio'), { status: 400 });
     }
 
-    const startDate = new Date(existing[0].start_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const daysWorked = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    const endDate = today.toISOString().split('T')[0];
+    const daysWorked = Math.ceil((selectedEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     await db.query(`
       UPDATE affiliations SET
         end_date = ?,
-        status = 'Inactivo',
         days_worked = ?,
         withdrawal_reason = ?,
         withdrawal_observations = ?
@@ -54,7 +50,7 @@ export class CloseAffiliationService {
     return {
       id: affiliationId,
       end_date: endDate,
-      status: 'Inactivo',
+      status: existing[0].status,
       days_worked: daysWorked,
       withdrawal_reason: withdrawalReason,
     };
