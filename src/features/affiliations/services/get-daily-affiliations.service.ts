@@ -40,7 +40,7 @@ export class GetDailyAffiliationsService {
   ): Promise<{ items: DailyAffiliationItem[] }> {
     logger.info('Fetching daily affiliations', { agencyId, userId, role, date, officeId });
 
-    const conditions = ['co.agency_id = ?', 'DATE(lp.created_at) = ?'];
+    const conditions = ['co.agency_id = ?', 'DATE(a.created_at) = ?', "a.status = 'Activo'"];
     const params: any[] = [agencyId, date];
 
     if (role !== 'admin') {
@@ -93,9 +93,9 @@ export class GetDailyAffiliationsService {
         LEFT JOIN arl_list ar ON ar.id = a.arl_id
         LEFT JOIN ccf_list cc ON cc.id = a.ccf_id
         LEFT JOIN pension_fund_list p ON p.id = a.pension_id
-        INNER JOIN monthly_payments lp ON lp.affiliation_id = a.id
+        INNER JOIN monthly_payments lp ON lp.affiliation_id = a.id AND lp.month = MONTH(a.start_date) AND lp.year = YEAR(a.start_date)
       WHERE ${conditions.join(' AND ')}
-      ORDER BY o.name, lp.created_at DESC`;
+      ORDER BY o.name, a.created_at DESC`;
 
     const [rows] = await pool.query(sql, params);
     return { items: rows as DailyAffiliationItem[] };

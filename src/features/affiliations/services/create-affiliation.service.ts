@@ -5,8 +5,6 @@ interface CreateAffiliationDTO {
   client_id: number;
   company_id: number;
   office_id?: number;
-  start_date: string;
-  end_date: string; // Hecho obligatorio
   value: number;
   payment_method?: 'Efectivo' | 'Transferencia' | 'Nequi' | 'Daviplata' | 'Otro';
   eps_id?: number | null;
@@ -66,21 +64,23 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
     clientEmployerId = result.insertId;
   }
 
-  if (!data.end_date) {
-    throw Object.assign(new Error('La fecha de fin es obligatoria.'), { status: 400 });
-  }
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
 
-  const [yearStr, monthStr] = (data.start_date || '').split('-');
-  const month = parseInt(monthStr || '0', 10);
-  const year = parseInt(yearStr || '0', 10);
+  const start_date = `${year}-${String(month).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  
+  // La cobertura va hasta el último día del mes actual
+  const endDateObj = new Date(year, month, 0); 
+  const end_date = `${year}-${String(month).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
 
   const validator = new AffiliationOverlapValidator(agencyId);
-  const daysWorked = validator.calculateDaysWorked(data.start_date, data.end_date || null);
+  const daysWorked = validator.calculateDaysWorked(start_date, end_date);
 
   const validation = await validator.validate({
     client_employer_id: clientEmployerId,
-    start_date: data.start_date,
-    end_date: data.end_date || null,
+    start_date,
+    end_date,
     month,
     year,
   });
@@ -102,8 +102,8 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           clientEmployerId,
-          data.start_date,
-          data.end_date,
+          start_date,
+          end_date,
           'Activo',
           daysWorked,
           data.eps_id || null,

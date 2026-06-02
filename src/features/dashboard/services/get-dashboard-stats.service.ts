@@ -32,17 +32,31 @@ export class GetDashboardStatsService {
     const currentMonth = targetMonth || (today.getMonth() + 1);
     const currentYear = targetYear || today.getFullYear();
 
-    const [currentMonthRows]: any = await pool.query(
+    // 1. New affiliations in target month (KPIs)
+    const [newAffiliationsRows]: any = await pool.query(
       `SELECT 
-        COUNT(*) as total,
+        COUNT(a.id) as total,
         SUM(CASE WHEN mp.payment_status = 'Pagado' THEN 1 ELSE 0 END) as paid,
         SUM(CASE WHEN mp.payment_status = 'Pendiente' THEN 1 ELSE 0 END) as pending,
         SUM(CASE WHEN mp.payment_status = 'En Proceso' THEN 1 ELSE 0 END) as inProcess
+      FROM affiliations a
+      JOIN client_employers ce ON ce.id = a.client_employer_id
+      JOIN companies co ON co.id = ce.company_id
+      LEFT JOIN monthly_payments mp ON mp.affiliation_id = a.id AND mp.month = ? AND mp.year = ?
+      WHERE ${whereClause} AND a.status = 'Activo' AND MONTH(a.created_at) = ? AND YEAR(a.created_at) = ?`,
+      [currentMonth, currentYear, ...baseParams, currentMonth, currentYear]
+    );
+
+    // 1.5 Revenue for the target month (All payments)
+    const [revenueRows]: any = await pool.query(
+      `SELECT 
+        SUM(mp.value) as totalValue,
+        SUM(CASE WHEN mp.payment_status = 'Pagado' THEN mp.value ELSE 0 END) as paidValue
       FROM monthly_payments mp
       JOIN affiliations a ON a.id = mp.affiliation_id
       JOIN client_employers ce ON ce.id = a.client_employer_id
       JOIN companies co ON co.id = ce.company_id
-      WHERE ${whereClause} AND mp.month = ? AND mp.year = ?`,
+      WHERE ${whereClause} AND a.status = 'Activo' AND mp.month = ? AND mp.year = ?`,
       [...baseParams, currentMonth, currentYear]
     );
 
@@ -64,21 +78,7 @@ export class GetDashboardStatsService {
       baseParams
     );
 
-    // 3. Expiring soon (Activo and end_date between today and today+5)
-    const [expiringRows]: any = await pool.query(
-      `SELECT 
-        COUNT(*) as count,
-        COALESCE(SUM(mp.value), 0) as value
-      FROM affiliations a
-      JOIN client_employers ce ON ce.id = a.client_employer_id
-      JOIN companies co ON co.id = ce.company_id
-      JOIN monthly_payments mp ON mp.affiliation_id = a.id
-      WHERE ${whereClause} 
-        AND a.status = 'Activo'
-        AND a.end_date >= CURDATE() AND a.end_date <= DATE_ADD(CURDATE(), INTERVAL 5 DAY)
-        AND mp.id = (SELECT MAX(id) FROM monthly_payments WHERE affiliation_id = a.id)`,
-      baseParams
-    );
+
 
     // 4. Revenue Trend (last 6 months from selected month by actual payment date)
     const [trendRows]: any = await pool.query(
@@ -113,21 +113,31 @@ export class GetDashboardStatsService {
 
     return {
       currentMonth: {
-        total: currentMonthRows[0].total || 0,
-        paid: currentMonthRows[0].paid || 0,
-        pending: currentMonthRows[0].pending || 0,
-        inProcess: currentMonthRows[0].inProcess || 0
+        total: Number(newAffiliationsRows[0]?.total || 0),
+        paid: Number(newAffiliationsRows[0]?.paid || 0),
+        pending: Number(newAffiliationsRows[0]?.pending || 0),
+        inProcess: Number(newAffiliationsRows[0]?.inProcess || 0)
+      },
+      currentMonthRevenue: {
+        total: Number(revenueRows[0]?.totalValue || 0),
+        paid: Number(revenueRows[0]?.paidValue || 0)
       },
       overdue: {
-        count: overdueRows[0].count || 0,
-        value: Number(overdueRows[0].value) || 0
+        count: Number(overdueRows[0]?.count || 0),
+        value: Number(overdueRows[0]?.value || 0)
       },
       expiringSoon: {
-        count: expiringRows[0].count || 0,
-        value: Number(expiringRows[0].value) || 0
+        count: 0,
+        value: 0
       },
-      trendData: trendRows,
-      totalAffiliations: totalRows[0].total || 0
+      trendData: trendRows.map((r: any) => ({
+        month: r.month,
+        year: r.year,
+        value: Number(r.value || 0),
+        count: Number(r.count || 0),
+        paid: Number(r.paid || 0),
+        pending: Number(r.pending || 0)
+      }))
     };
   }
 }

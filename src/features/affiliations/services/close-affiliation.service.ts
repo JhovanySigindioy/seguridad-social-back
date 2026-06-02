@@ -32,15 +32,13 @@ export class CloseAffiliationService {
     const selectedEndDate = new Date(endDate);
     selectedEndDate.setHours(23, 59, 59, 999);
 
-    if (selectedEndDate < startDate) {
-      throw Object.assign(new Error('La fecha de fin no puede ser menor a la fecha de inicio'), { status: 400 });
-    }
-
-    const daysWorked = Math.ceil((selectedEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    let daysWorked = Math.ceil((selectedEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (daysWorked < 0) daysWorked = 0;
 
     await db.query(`
       UPDATE affiliations SET
         end_date = ?,
+        status = 'Inactivo',
         days_worked = ?,
         withdrawal_reason = ?,
         withdrawal_observations = ?
@@ -50,7 +48,7 @@ export class CloseAffiliationService {
     return {
       id: affiliationId,
       end_date: endDate,
-      status: existing[0].status,
+      status: 'Inactivo',
       days_worked: daysWorked,
       withdrawal_reason: withdrawalReason,
     };

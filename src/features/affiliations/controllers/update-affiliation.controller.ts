@@ -18,6 +18,8 @@ const updateSchema = z.object({
   payment_method: z.string().nullable(),
   is_auto_renewed: z.boolean(),
   observation: z.string().nullable().optional(),
+  gov_record_at: z.string().nullable().optional(),
+  created_at: z.string().nullable().optional(),
 });
 
 export const updateAffiliationController = asyncHandler(async (req, res) => {
@@ -37,6 +39,8 @@ export const updateAffiliationController = asyncHandler(async (req, res) => {
     start_date: validatedData.start_date ?? null,
     end_date: validatedData.end_date ?? null,
     observation: validatedData.observation ?? null,
+    gov_record_at: validatedData.gov_record_at ?? null,
+    created_at: validatedData.created_at ?? null,
     affiliationId,
     agencyId,
     userId,

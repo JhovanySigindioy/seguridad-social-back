@@ -8,6 +8,7 @@ import { updateAffiliationController } from './controllers/update-affiliation.co
 import { updateAffiliationStatusController } from './controllers/update-affiliation-status.controller.js';
 import { closeAffiliationController } from './controllers/close-affiliation.controller.js';
 import { getLatestByClientController } from './controllers/get-latest-by-client.controller.js';
+import { getInvoiceController } from './controllers/get-invoice.controller.js';
 
 const router = Router();
 
@@ -20,6 +21,7 @@ router.get('/form-data', getFormDataController);
 router.put('/:id', updateAffiliationController);
 router.patch('/:id/status', updateAffiliationStatusController);
 router.patch('/:id/close', closeAffiliationController);
+router.get('/:id/invoice', getInvoiceController);
 router.post('/', createAffiliationController);
 
 export default router;
