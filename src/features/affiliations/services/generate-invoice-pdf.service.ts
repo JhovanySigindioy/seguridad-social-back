@@ -69,8 +69,8 @@ export class GenerateInvoicePdfService {
 
     const data = rows[0];
 
-    if (data.payment_status !== 'Pagado') {
-      throw Object.assign(new Error('Solo se puede generar la factura si el estado es Pagado.'), { status: 400 });
+    if (!['En Proceso', 'Pagado'].includes(data.payment_status)) {
+      throw Object.assign(new Error('Solo se puede generar la factura si el estado es En Proceso o Pagado.'), { status: 400 });
     }
 
     // 3. Generate HTML

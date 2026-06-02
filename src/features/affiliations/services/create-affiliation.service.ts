@@ -128,7 +128,7 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
           month,
           year,
           data.value,
-          data.payment_method ? 'Pagado' : 'Pendiente',
+          'Pendiente',
           data.payment_method || null,
           data.is_auto_renewed ? 1 : 0,
           createdBy
