@@ -3,7 +3,7 @@ import type { PaymentStatus } from '../types/affiliation.types.js';
 
 const ALLOWED_STATUSES_BY_ROLE: Record<string, PaymentStatus[]> = {
   admin: ['Pendiente', 'En Proceso', 'Pagado'],
-  office_manager: ['Pendiente', 'En Proceso'],
+  office_manager: ['Pendiente', 'En Proceso', 'Pagado'],
 };
 
 interface UpdateAffiliationStatusDTO {
@@ -69,10 +69,6 @@ export class UpdateAffiliationStatusService {
     } else {
       currentStatus = rows[0].payment_status as PaymentStatus;
       govRecordAt = rows[0].gov_record_at;
-    }
-
-    if (role === 'office_manager' && currentStatus === 'Pagado') {
-      throw Object.assign(new Error('No puedes modificar una afiliacion pagada'), { status: 403 });
     }
 
     if (currentStatus === paymentStatus) {

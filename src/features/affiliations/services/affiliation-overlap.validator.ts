@@ -35,43 +35,6 @@ export class AffiliationOverlapValidator {
       };
     }
 
-
-
-    const lastAffiliation = await this.getLastAffiliation(client_employer_id);
-
-    if (lastAffiliation) {
-      if (lastAffiliation.status === 'Activo') {
-        const lastEndDate = lastAffiliation.end_date ? new Date(lastAffiliation.end_date) : null;
-
-        if (!lastEndDate) {
-          return {
-            valid: false,
-            error: 'El trabajador ya tiene una afiliación activa sin fecha de retiro. Cierra la afiliación actual antes de crear una nueva.',
-          };
-        }
-
-        const oneDayAfterLastEnd = new Date(lastEndDate);
-        oneDayAfterLastEnd.setDate(oneDayAfterLastEnd.getDate() + 1);
-
-        if (parsedStartDate <= lastEndDate) {
-          return {
-            valid: false,
-            error: `No puedes crear una nueva afiliación que inicie el ${start_date}. La afiliación anterior terminó el ${lastAffiliation.end_date}. La nueva fecha de inicio debe ser al menos un día después.`,
-            conflictingPeriod: lastAffiliation,
-          };
-        }
-      }
-
-      if (parsedEndDate && parsedEndDate.getFullYear() === new Date(lastAffiliation.start_date).getFullYear() &&
-          parsedEndDate.getMonth() === new Date(lastAffiliation.start_date).getMonth()) {
-        return {
-          valid: false,
-          error: 'No puedes registrar una afiliación que termine en un mes diferente al de inicio.',
-          conflictingPeriod: lastAffiliation,
-        };
-      }
-    }
-
     return { valid: true };
   }
 
