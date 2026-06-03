@@ -6,6 +6,8 @@ interface DailyAffiliationItem {
   client_id: number;
   client_name: string;
   client_identification: string;
+  client_phone_1: string | null;
+  client_phone_2: string | null;
   company_id: number;
   company_name: string;
   office_id: number;
@@ -58,6 +60,8 @@ export class GetDailyAffiliationsService {
         ce.client_id,
         CONCAT_WS(' ', c.first_name, c.second_name, c.first_lastname, c.second_lastname) AS client_name,
         c.identification AS client_identification,
+        c.phone_1 AS client_phone_1,
+        c.phone_2 AS client_phone_2,
         co.id AS company_id,
         co.name AS company_name,
         c.office_id,
