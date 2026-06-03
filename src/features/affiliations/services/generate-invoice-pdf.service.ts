@@ -1,33 +1,97 @@
-import puppeteer, { Browser } from 'puppeteer';
+import PDFDocument from 'pdfkit';
 import pool from '../../../config/database.js';
 import logger from '../../../shared/utils/logger.js';
 import { resolve } from 'path';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 
-let browserInstance: Browser | null = null;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function getBrowserInstance() {
-  if (browserInstance && !browserInstance.connected) {
-    browserInstance = null;
-  }
-  if (!browserInstance) {
-    browserInstance = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
-    });
-  }
-  return browserInstance;
+function getInvoiceFilePath(affiliationId: number, month: number, year: number): string {
+  return resolve(process.cwd(), 'uploads', 'invoices', `invoice-${affiliationId}-${year}-${String(month).padStart(2, '0')}.pdf`);
 }
 
+function ensureInvoicesDir(): void {
+  const dir = resolve(process.cwd(), 'uploads', 'invoices');
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+}
+
+function formatCurrency(val: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+  }).format(val || 0);
+}
+
+function getMonthName(m: number): string {
+  const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return months[m - 1] ?? String(m);
+}
+
+function formatDate(): string {
+  return new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
 export class GenerateInvoicePdfService {
+  /**
+   * Serves the invoice PDF.
+   * If already on disk → serves instantly.
+   * If not → generates lazily, saves, then serves.
+   */
   async execute(affiliationId: number, month: number, year: number, agencyId: number): Promise<Buffer> {
+    const filePath = getInvoiceFilePath(affiliationId, month, year);
+
+    if (existsSync(filePath)) {
+      logger.info('Serving existing invoice PDF from disk', { affiliationId, month, year });
+      return readFileSync(filePath);
+    }
+
+    logger.info('Invoice not on disk, generating lazily', { affiliationId, month, year });
+    return this.generateAndSave(affiliationId, month, year, agencyId);
+  }
+
+  /**
+   * Checks if invoice exists, if not generates it. Returns true if it already existed.
+   */
+  async executeWithCheck(affiliationId: number, month: number, year: number, agencyId: number): Promise<boolean> {
+    const filePath = getInvoiceFilePath(affiliationId, month, year);
+
+    if (existsSync(filePath)) {
+      return true;
+    }
+
+    await this.generateAndSave(affiliationId, month, year, agencyId);
+    return false;
+  }
+
+  /**
+   * Generates and persists the invoice PDF.
+   * Called automatically on status change to "En Proceso"/"Pagado".
+   */
+  async generateAndSave(affiliationId: number, month: number, year: number, agencyId: number): Promise<Buffer> {
     logger.info('Generating invoice PDF', { affiliationId, month, year, agencyId });
 
-    // 1. Fetch affiliation details
+    const data = await this.fetchAffiliationData(affiliationId, month, year, agencyId);
+    const pdfBuffer = await this.buildPdf(data);
+
+    ensureInvoicesDir();
+    const filePath = getInvoiceFilePath(affiliationId, month, year);
+    writeFileSync(filePath, pdfBuffer);
+    logger.info('Invoice PDF saved', { filePath });
+
+    return pdfBuffer;
+  }
+
+  // ─── Private ────────────────────────────────────────────────────────────────
+
+  private async fetchAffiliationData(affiliationId: number, month: number, year: number, agencyId: number): Promise<any> {
     const sql = `
       SELECT
         a.id,
-        ce.client_id,
         CONCAT_WS(' ', c.first_name, c.second_name, c.first_lastname, c.second_lastname) AS client_name,
         c.identification   AS client_identification,
         co.name            AS company_name,
@@ -35,10 +99,10 @@ export class GenerateInvoicePdfService {
         mp.month,
         mp.year,
         mp.value,
-        COALESCE(e.name, '—') AS eps_name,
+        COALESCE(e.name,  '—') AS eps_name,
         COALESCE(ar.name, '—') AS arl_name,
         COALESCE(cc.name, '—') AS ccf_name,
-        COALESCE(p.name, '—')  AS pension_name,
+        COALESCE(p.name,  '—') AS pension_name,
         a.risk_level,
         mp.payment_status,
         mp.payment_method,
@@ -48,21 +112,21 @@ export class GenerateInvoicePdfService {
         o.logo_url         AS logo_url,
         ag.name            AS agency_name
       FROM affiliations a
-        INNER JOIN client_employers ce ON ce.id = a.client_employer_id
-        INNER JOIN clients          c  ON c.id  = ce.client_id
-        INNER JOIN companies        co ON co.id = ce.company_id
-        INNER JOIN offices          o  ON o.id  = ce.office_id
-        INNER JOIN agencies         ag ON ag.id = co.agency_id
-        LEFT  JOIN eps_list         e  ON e.id  = a.eps_id
-        LEFT  JOIN arl_list         ar ON ar.id = a.arl_id
-        LEFT  JOIN ccf_list         cc ON cc.id = a.ccf_id
-        LEFT  JOIN pension_fund_list p ON p.id  = a.pension_id
-        LEFT  JOIN monthly_payments mp ON mp.affiliation_id = a.id AND mp.month = ? AND mp.year = ?
+        INNER JOIN client_employers  ce ON ce.id  = a.client_employer_id
+        INNER JOIN clients           c  ON c.id   = ce.client_id
+        INNER JOIN companies         co ON co.id  = ce.company_id
+        INNER JOIN offices           o  ON o.id   = ce.office_id
+        INNER JOIN agencies          ag ON ag.id  = co.agency_id
+        LEFT  JOIN eps_list          e  ON e.id   = a.eps_id
+        LEFT  JOIN arl_list          ar ON ar.id  = a.arl_id
+        LEFT  JOIN ccf_list          cc ON cc.id  = a.ccf_id
+        LEFT  JOIN pension_fund_list p  ON p.id   = a.pension_id
+        LEFT  JOIN monthly_payments  mp ON mp.affiliation_id = a.id AND mp.month = ? AND mp.year = ?
       WHERE a.id = ? AND co.agency_id = ?
     `;
 
     const [rows]: any = await pool.query(sql, [month, year, affiliationId, agencyId]);
-    
+
     if (!rows || rows.length === 0) {
       throw Object.assign(new Error('Afiliación o pago no encontrado para el periodo seleccionado.'), { status: 404 });
     }
@@ -73,476 +137,233 @@ export class GenerateInvoicePdfService {
       throw Object.assign(new Error('Solo se puede generar la factura si el estado es En Proceso o Pagado.'), { status: 400 });
     }
 
-    // 3. Generate HTML
-    const html = this.generateHtml(data);
-
-    // 4. Convert to PDF using puppeteer
-    const browser = await getBrowserInstance();
-    
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'domcontentloaded' });
-    
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: { top: '0', bottom: '0', left: '0', right: '0' },
-      printBackground: true
-    });
-    
-    await page.close();
-
-    return Buffer.from(pdfBuffer);
+    return data;
   }
 
-  private generateHtml(data: any): string {
-    const formatCurrency = (val: number) => {
-      return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
-    };
+  private buildPdf(data: any): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: 'A4',
+          margin: 0,
+          info: {
+            Title: `Comprobante ${data.year}-${String(data.month).padStart(2, '0')}-${String(data.id).padStart(4, '0')}`,
+            Author: data.agency_name || 'Seguridad Social',
+          },
+        });
 
-    const formatDate = () => {
-      const d = new Date();
-      return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
-    };
+        const chunks: Buffer[] = [];
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
 
-    const getMonthName = (m: number) => {
-      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-      return months[m - 1] || m;
-    };
+        this.renderPdf(doc, data);
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
 
-    const invoiceNumber = `${data.year}-${String(data.month).padStart(2, '0')}-${String(data.id).padStart(4, '0')}`;
-    
-    let logoHtml = `<div class="logo-placeholder"><span>${data.office_name.charAt(0).toUpperCase()}</span></div>`;
+  private renderPdf(doc: PDFKit.PDFDocument, data: any): void {
+    const W = 595.28;   // A4 width in points
+    const H = 841.89;   // A4 height in points
+    const margin = 40;
+    const contentWidth = W - margin * 2;
+
+    // ── Colour palette ──────────────────────────────────────────────────────
+    const BLUE        = '#2563EB';
+    const BLUE_DARK   = '#1D4ED8';
+    const BLUE_LIGHT  = '#EFF6FF';
+    const GRAY_800    = '#1E293B';
+    const GRAY_500    = '#64748B';
+    const GRAY_200    = '#E2E8F0';
+    const GREEN       = '#166534';
+    const GREEN_BG    = '#DCFCE7';
+    const AMBER       = '#92400E';
+    const AMBER_BG    = '#FEF9C3';
+    const WHITE       = '#FFFFFF';
+
+    // ── Top accent bar ───────────────────────────────────────────────────────
+    doc.rect(0, 0, W, 8).fill(BLUE);
+
+    // ── Background ───────────────────────────────────────────────────────────
+    doc.rect(0, 8, W, H - 8).fill('#F8FAFC');
+
+    // ── White card area ───────────────────────────────────────────────────────
+    doc.roundedRect(margin - 10, 28, W - (margin - 10) * 2, H - 56, 12)
+      .fill(WHITE);
+
+    let y = 48;
+
+    // ── Logo / agency name ────────────────────────────────────────────────────
+    let logoLoaded = false;
     if (data.logo_url) {
       try {
         const cleanPath = data.logo_url.replace(/^\//, '');
-        // Usamos path relativo al cwd del backend. Esto asume que el frontend y backend están en carpetas hermanas
         const logoPath = resolve(process.cwd(), '../seguridad-social-front/public', cleanPath);
-        const ext = cleanPath.split('.').pop() || 'png';
-        const base64 = readFileSync(logoPath, 'base64');
-        logoHtml = `<img src="data:image/${ext};base64,${base64}" alt="Logo Agencia" class="logo">`;
-      } catch (err) {
-        logger.warn('No se pudo cargar el logo como base64', { err: err instanceof Error ? err.message : String(err) });
+        doc.image(logoPath, margin, y, { height: 50, fit: [120, 50] });
+        logoLoaded = true;
+      } catch {
+        // fallback below
       }
     }
 
-    return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Factura No. ${invoiceNumber}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-            :root {
-                --primary: #2563eb;
-                --primary-dark: #1d4ed8;
-                --primary-light: #eff6ff;
-                --accent: #f59e0b;
-                --text-main: #0f172a;
-                --text-muted: #64748b;
-                --border: #e2e8f0;
-                --bg-main: #ffffff;
-                --bg-subtle: #f8fafc;
-            }
+    if (!logoLoaded) {
+      // Placeholder square with initial
+      doc.roundedRect(margin, y, 50, 50, 8).fill(BLUE);
+      doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(22)
+        .text((data.office_name || 'S').charAt(0).toUpperCase(), margin, y + 13, { width: 50, align: 'center' });
+    }
 
-            * {
-                box-sizing: border-box;
-                -webkit-font-smoothing: antialiased;
-            }
+    // Agency / office info
+    doc.fillColor(GRAY_800).font('Helvetica-Bold').fontSize(16)
+      .text(data.office_name || 'Seguridad Social', margin + 64, y + 6, { width: contentWidth - 260 });
 
-            body {
-                font-family: 'Outfit', sans-serif;
-                font-size: 13px;
-                margin: 0;
-                padding: 0;
-                color: var(--text-main);
-                background-color: var(--bg-subtle);
-                line-height: 1.5;
-            }
+    // Invoice label + number (right side)
+    const invoiceNumber = `${data.year}-${String(data.month).padStart(2, '0')}-${String(data.id).padStart(4, '0')}`;
+    doc.fillColor(BLUE).font('Helvetica-Bold').fontSize(22)
+      .text('COMPROBANTE', margin, y + 2, { width: contentWidth, align: 'right' });
+    doc.fillColor(GRAY_500).font('Helvetica').fontSize(11)
+      .text(`No. ${invoiceNumber}`, margin, y + 28, { width: contentWidth, align: 'right' });
 
-            .page-container {
-                width: 210mm;
-                min-height: 297mm;
-                background: var(--bg-main);
-                margin: 0 auto;
-                padding: 50px 40px;
-                position: relative;
-                box-shadow: 0 0 20px rgba(0,0,0,0.05);
-            }
+    // Status badge
+    const statusColor  = data.payment_status === 'Pagado' ? GREEN : AMBER;
+    const statusBg     = data.payment_status === 'Pagado' ? GREEN_BG : AMBER_BG;
+    const statusText   = `ESTADO: ${(data.payment_status || '').toUpperCase()}`;
+    const badgeW = 160; const badgeH = 22;
+    const badgeX = W - margin - badgeW;
+    doc.roundedRect(badgeX, y + 50, badgeW, badgeH, 11).fill(statusBg);
+    doc.fillColor(statusColor).font('Helvetica-Bold').fontSize(9)
+      .text(statusText, badgeX, y + 56, { width: badgeW, align: 'center' });
 
-            /* Decoración superior */
-            .top-bar {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 8px;
-                background: linear-gradient(90deg, var(--primary) 0%, #3b82f6 100%);
-            }
+    y += 90;
 
-            .header {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 40px;
-                padding-bottom: 30px;
-                border-bottom: 2px solid var(--primary-light);
-            }
+    // ── Divider ────────────────────────────────────────────────────────────────
+    doc.moveTo(margin, y).lineTo(W - margin, y).strokeColor(BLUE_LIGHT).lineWidth(2).stroke();
+    y += 16;
 
-            .header-left {
-                display: flex;
-                flex-direction: column;
-                gap: 15px;
-            }
+    // ── Info boxes ─────────────────────────────────────────────────────────────
+    const boxW = (contentWidth - 16) / 2;
+    const drawInfoBox = (x: number, bY: number, title: string, rows: [string, string][]) => {
+      const bH = 22 + rows.length * 22 + 14;
+      doc.roundedRect(x, bY, boxW, bH, 8).fill(BLUE_LIGHT);
+      doc.fillColor(BLUE).font('Helvetica-Bold').fontSize(9)
+        .text(title.toUpperCase(), x + 14, bY + 10, { width: boxW - 28, characterSpacing: 0.8 });
+      rows.forEach(([label, value], i) => {
+        const rowY = bY + 26 + i * 22;
+        doc.fillColor(GRAY_500).font('Helvetica').fontSize(10).text(label, x + 14, rowY, { width: 90 });
+        doc.fillColor(GRAY_800).font('Helvetica-Bold').fontSize(10).text(value || '—', x + 108, rowY, { width: boxW - 122 });
+        if (i < rows.length - 1) {
+          doc.moveTo(x + 14, rowY + 18).lineTo(x + boxW - 14, rowY + 18).strokeColor(GRAY_200).lineWidth(0.5).stroke();
+        }
+      });
+      return bH;
+    };
 
-            .logo {
-                max-width: 140px;
-                max-height: 70px;
-                object-fit: contain;
-            }
+    const leftH = drawInfoBox(margin, y, 'Facturar A', [
+      ['Cliente:',        data.client_name || '—'],
+      ['Identificación:', data.client_identification || '—'],
+      ['Empresa:',        data.company_name || '—'],
+    ]);
 
-            .logo-placeholder {
-                width: 60px;
-                height: 60px;
-                background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-size: 24px;
-                font-weight: bold;
-                box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-            }
+    const rightH = drawInfoBox(margin + boxW + 16, y, 'Detalles del Documento', [
+      ['Emisión:',   formatDate()],
+      ['Periodo:',   `${getMonthName(data.month)} ${data.year}`],
+      ['Método:',    data.payment_method || 'Por Definir'],
+    ]);
 
-            .company-details h1 {
-                margin: 0;
-                font-size: 24px;
-                font-weight: 700;
-                color: var(--text-main);
-                letter-spacing: -0.5px;
-            }
+    y += Math.max(leftH, rightH) + 20;
 
-            .company-details p {
-                margin: 4px 0 0 0;
-                color: var(--text-muted);
-                font-size: 13px;
-            }
+    // ── Items table ────────────────────────────────────────────────────────────
+    const colDesc = margin;
+    const colEnt  = margin + 220;
+    const colVal  = W - margin - 120;
+    const colValW = 120;
 
-            .invoice-title {
-                text-align: right;
-            }
+    // Header
+    doc.roundedRect(margin, y, contentWidth, 28, 6).fill(BLUE_LIGHT);
+    doc.fillColor(BLUE_DARK).font('Helvetica-Bold').fontSize(9)
+      .text('DESCRIPCIÓN DEL SERVICIO', colDesc + 10, y + 9, { width: colEnt - colDesc - 10, characterSpacing: 0.5 })
+      .text('ENTIDADES ASIGNADAS',      colEnt,       y + 9, { width: colVal - colEnt - 10,  characterSpacing: 0.5 })
+      .text('IMPORTE',                  colVal,        y + 9, { width: colValW, align: 'right', characterSpacing: 0.5 });
+    y += 36;
 
-            .invoice-title h2 {
-                margin: 0;
-                font-size: 32px;
-                font-weight: 700;
-                color: var(--primary);
-                letter-spacing: -1px;
-                text-transform: uppercase;
-            }
+    // Row bg
+    const rowH = 88;
+    doc.roundedRect(margin, y - 6, contentWidth, rowH, 6).fill(WHITE)
+      .roundedRect(margin, y - 6, contentWidth, rowH, 6).strokeColor(GRAY_200).lineWidth(1).stroke();
 
-            .invoice-title .invoice-no {
-                font-size: 16px;
-                font-weight: 600;
-                color: var(--text-muted);
-                margin-top: 5px;
-            }
+    doc.fillColor(GRAY_800).font('Helvetica-Bold').fontSize(11)
+      .text('Aportes a Seguridad Social Integral', colDesc + 10, y + 4, { width: colEnt - colDesc - 20 });
+    doc.fillColor(GRAY_500).font('Helvetica').fontSize(9)
+      .text(`Periodo: ${getMonthName(data.month)} ${data.year}`, colDesc + 10, y + 22, { width: colEnt - colDesc - 20 })
+      .text('Incluye gestión y administración.', colDesc + 10, y + 34, { width: colEnt - colDesc - 20 });
 
-            .info-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 30px;
-                margin-bottom: 40px;
-            }
+    const services = [
+      ['EPS', data.eps_name], ['AFP', data.pension_name],
+      ['ARL', `${data.arl_name}${data.risk_level ? ' (Riesgo ' + data.risk_level + ')' : ''}`],
+      ['CCF', data.ccf_name],
+    ];
+    let currentY = y + 4;
+    services.forEach(([label, val]) => {
+      doc.fillColor(GRAY_500).font('Helvetica').fontSize(9)
+        .text(`${label}:`, colEnt, currentY, { width: 30 });
+      
+      doc.fillColor(GRAY_800).font('Helvetica-Bold');
+      const valStr = val || '—';
+      const textHeight = doc.heightOfString(valStr, { width: colVal - colEnt - 35 });
+      
+      doc.text(valStr, colEnt + 30, currentY, { width: colVal - colEnt - 35 });
+      
+      currentY += textHeight + 4;
+    });
 
-            .info-box {
-                background: var(--bg-subtle);
-                border-radius: 12px;
-                padding: 20px;
-                border: 1px solid var(--border);
-            }
+    doc.fillColor(BLUE_DARK).font('Helvetica-Bold').fontSize(14)
+      .text(formatCurrency(data.value), colVal, y + 28, { width: colValW, align: 'right' });
 
-            .info-box h3 {
-                margin: 0 0 12px 0;
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                color: var(--primary);
-                font-weight: 700;
-            }
+    y += rowH + 20;
 
-            .info-box p {
-                margin: 6px 0;
-                display: flex;
-                justify-content: space-between;
-                border-bottom: 1px dashed var(--border);
-                padding-bottom: 6px;
-            }
-            .info-box p:last-child {
-                border-bottom: none;
-                padding-bottom: 0;
-            }
+    // ── Totals ─────────────────────────────────────────────────────────────────
+    const totalsX = W - margin - 220;
+    const totalsW = 220;
+    doc.roundedRect(totalsX, y, totalsW, 84, 8).fill(BLUE_LIGHT);
 
-            .info-box strong {
-                color: var(--text-muted);
-                font-weight: 500;
-            }
+    const drawTotalRow = (label: string, value: string, tY: number, bold = false) => {
+      doc.fillColor(bold ? BLUE_DARK : GRAY_500)
+        .font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10)
+        .text(label, totalsX + 14, tY, { width: 100 });
+      doc.fillColor(bold ? BLUE_DARK : GRAY_800)
+        .font('Helvetica-Bold').fontSize(bold ? 14 : 10)
+        .text(value, totalsX + 14, tY, { width: totalsW - 28, align: 'right' });
+    };
 
-            .info-box span {
-                font-weight: 600;
-                color: var(--text-main);
-                text-align: right;
-            }
+    drawTotalRow('Subtotal',     formatCurrency(data.value), y + 14);
+    doc.moveTo(totalsX + 14, y + 36).lineTo(totalsX + totalsW - 14, y + 36)
+      .strokeColor(BLUE_DARK).lineWidth(0.5).stroke();
+    drawTotalRow('Impuestos (0%)', '$0',                      y + 42);
+    doc.moveTo(totalsX + 14, y + 62).lineTo(totalsX + totalsW - 14, y + 62)
+      .strokeColor(BLUE_DARK).lineWidth(1).dash(4, { space: 3 }).stroke();
+    drawTotalRow('TOTAL A PAGAR', formatCurrency(data.value), y + 66, true);
 
-            table.items {
-                width: 100%;
-                border-collapse: separate;
-                border-spacing: 0;
-                margin-bottom: 30px;
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                overflow: hidden;
-            }
+    y += 104;
 
-            table.items thead {
-                background: var(--primary-light);
-            }
+    // ── Footer ─────────────────────────────────────────────────────────────────
+    doc.moveTo(margin, y).lineTo(W - margin, y).strokeColor(GRAY_200).undash().lineWidth(1).stroke();
+    y += 14;
 
-            table.items th {
-                padding: 14px 20px;
-                text-align: left;
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                color: var(--primary-dark);
-                font-weight: 600;
-                border-bottom: 2px solid var(--border);
-            }
+    doc.fillColor(GRAY_800).font('Helvetica-Bold').fontSize(10)
+      .text('Términos y Condiciones', margin, y);
+    doc.fillColor(GRAY_500).font('Helvetica').fontSize(9)
+      .text(
+        'Este comprobante certifica la gestión de pago de los aportes al sistema general de seguridad social integral. '
+        + 'Los pagos a las entidades se realizan en los plazos establecidos por la ley.',
+        margin, y + 14, { width: contentWidth * 0.58 }
+      );
 
-            table.items th:last-child {
-                text-align: right;
-            }
-
-            table.items td {
-                padding: 16px 20px;
-                border-bottom: 1px solid var(--border);
-                vertical-align: top;
-            }
-
-            table.items tr:last-child td {
-                border-bottom: none;
-            }
-
-            .item-name {
-                font-weight: 600;
-                color: var(--text-main);
-                font-size: 14px;
-                margin-bottom: 4px;
-            }
-
-            .item-desc {
-                color: var(--text-muted);
-                font-size: 12px;
-            }
-
-            .item-price {
-                text-align: right;
-                font-weight: 600;
-                font-size: 15px;
-                color: var(--text-main);
-            }
-
-            .totals {
-                display: flex;
-                justify-content: flex-end;
-                margin-bottom: 40px;
-            }
-
-            .totals-box {
-                width: 300px;
-                background: var(--primary-light);
-                border-radius: 12px;
-                padding: 20px;
-                border: 1px solid rgba(37, 99, 235, 0.2);
-            }
-
-            .total-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 8px 0;
-            }
-
-            .total-row.final {
-                border-top: 2px dashed rgba(37, 99, 235, 0.3);
-                margin-top: 10px;
-                padding-top: 15px;
-            }
-
-            .total-row.final span:first-child {
-                font-weight: 700;
-                color: var(--primary-dark);
-                font-size: 16px;
-            }
-
-            .total-amount {
-                font-size: 24px;
-                font-weight: 800;
-                color: var(--primary-dark);
-            }
-
-            .footer-info {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 30px;
-                margin-top: auto;
-                padding-top: 30px;
-                border-top: 2px solid var(--border);
-            }
-
-            .payment-details h4 {
-                margin: 0 0 10px 0;
-                color: var(--text-main);
-                font-size: 14px;
-            }
-
-            .payment-details p {
-                margin: 4px 0;
-                color: var(--text-muted);
-            }
-
-            .status-badge {
-                display: inline-block;
-                padding: 6px 12px;
-                border-radius: 20px;
-                font-size: 12px;
-                font-weight: 600;
-                background: #dcfce7;
-                color: #166534;
-            }
-            .status-badge.pending {
-                background: #fef9c3;
-                color: #854d0e;
-            }
-            .status-badge.cancelled {
-                background: #fee2e2;
-                color: #991b1b;
-            }
-
-            .watermark {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 120px;
-                font-weight: 800;
-                color: rgba(0,0,0,0.02);
-                z-index: 0;
-                pointer-events: none;
-                white-space: nowrap;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="page-container">
-            <div class="top-bar"></div>
-            
-            <div class="watermark">${data.payment_status?.toUpperCase() || 'COMPROBANTE'}</div>
-
-            <div class="header" style="position: relative; z-index: 1;">
-                <div class="header-left">
-                    ${logoHtml}
-                    <div class="company-details">
-                        <h1>${data.office_name || 'Agencia de Seguridad Social'}</h1>
-                        <p>Sede Principal: ${data.agency_name || 'Principal'}</p>
-                        ${data.office_address ? `<p>${data.office_address}</p>` : ''}
-                    </div>
-                </div>
-                <div class="invoice-title">
-                    <h2>COMPROBANTE</h2>
-                    <div class="invoice-no">NO. ${invoiceNumber}</div>
-                    <div style="margin-top: 15px;">
-                        <span class="status-badge ${data.payment_status === 'Pagado' ? '' : data.payment_status === 'Pendiente' ? 'pending' : 'cancelled'}">
-                            ESTADO: ${data.payment_status?.toUpperCase() || 'PENDIENTE'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="info-grid" style="position: relative; z-index: 1;">
-                <div class="info-box">
-                    <h3>Facturar A</h3>
-                    <p><strong>Cliente:</strong> <span>${data.client_name}</span></p>
-                    <p><strong>Identificación:</strong> <span>${data.client_identification}</span></p>
-                    <p><strong>Vinculado A:</strong> <span>${data.company_name || 'N/A'}</span></p>
-                </div>
-                <div class="info-box">
-                    <h3>Detalles del Documento</h3>
-                    <p><strong>Fecha de Emisión:</strong> <span>${formatDate()}</span></p>
-                    <p><strong>Periodo Cubierto:</strong> <span>${getMonthName(data.month)} ${data.year}</span></p>
-                    <p><strong>Método de Pago:</strong> <span>${data.payment_method || 'Por Definir'}</span></p>
-                </div>
-            </div>
-
-            <table class="items" style="position: relative; z-index: 1;">
-                <thead>
-                    <tr>
-                        <th>Descripción del Servicio</th>
-                        <th>Entidad Asignada</th>
-                        <th>Importe</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            <div class="item-name">Aportes a Seguridad Social Integral</div>
-                            <div class="item-desc">Pago correspondiente al periodo de ${getMonthName(data.month)} ${data.year}. Incluye administración y gestión.</div>
-                            ${data.observation ? `<div class="item-desc" style="margin-top: 8px; color: var(--accent);"><strong>Nota:</strong> ${data.observation}</div>` : ''}
-                        </td>
-                        <td>
-                            <div class="item-desc"><strong>EPS:</strong> ${data.eps_name}</div>
-                            <div class="item-desc"><strong>ARL:</strong> ${data.arl_name} (Riesgo ${data.risk_level || 'N/A'})</div>
-                            <div class="item-desc"><strong>AFP:</strong> ${data.pension_name}</div>
-                            <div class="item-desc"><strong>CCF:</strong> ${data.ccf_name}</div>
-                        </td>
-                        <td class="item-price">
-                            ${formatCurrency(data.value)}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="totals" style="position: relative; z-index: 1;">
-                <div class="totals-box">
-                    <div class="total-row">
-                        <span style="color: var(--text-muted); font-weight: 500;">Subtotal</span>
-                        <span style="font-weight: 600;">${formatCurrency(data.value)}</span>
-                    </div>
-                    <div class="total-row">
-                        <span style="color: var(--text-muted); font-weight: 500;">Impuestos (0%)</span>
-                        <span style="font-weight: 600;">$0</span>
-                    </div>
-                    <div class="total-row final">
-                        <span>TOTAL A PAGAR</span>
-                        <span class="total-amount">${formatCurrency(data.value)}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="footer-info" style="position: relative; z-index: 1;">
-                <div class="payment-details">
-                    <h4>Términos y Condiciones</h4>
-                    <p>Este comprobante certifica la gestión de pago de los aportes al sistema general de seguridad social integral. Los pagos a las entidades correspondientes se realizan en los plazos establecidos por la ley.</p>
-                </div>
-                <div style="text-align: right;">
-                    <h4 style="margin: 0 0 10px 0; color: var(--text-main);">Gracias por preferir nuestros servicios</h4>
-                    <p style="margin: 0; color: var(--text-muted);">Generado automáticamente el ${formatDate()}</p>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
+    doc.fillColor(GRAY_800).font('Helvetica-Bold').fontSize(10)
+      .text('Gracias por preferir nuestros servicios', margin + contentWidth * 0.62, y, { width: contentWidth * 0.38, align: 'right' });
+    doc.fillColor(GRAY_500).font('Helvetica').fontSize(8)
+      .text(`Generado automáticamente el ${formatDate()}`, margin + contentWidth * 0.62, y + 14, { width: contentWidth * 0.38, align: 'right' });
   }
 }

@@ -1,5 +1,7 @@
 import db from '../../../config/database.js';
+import logger from '../../../shared/utils/logger.js';
 import type { PaymentStatus } from '../types/affiliation.types.js';
+import { GenerateInvoicePdfService } from './generate-invoice-pdf.service.js';
 
 const ALLOWED_STATUSES_BY_ROLE: Record<string, PaymentStatus[]> = {
   admin: ['Pendiente', 'En Proceso', 'Pagado'],
@@ -95,10 +97,23 @@ export class UpdateAffiliationStatusService {
       [affiliationId, month, year]
     );
 
-    return {
+    const result = {
       id: affiliationId,
       payment_status: paymentStatus,
       gov_record_at: updatedRows[0]?.gov_record_at ?? null,
     };
+
+    // Auto-generate and persist the invoice PDF when status becomes actionable
+    if (['En Proceso', 'Pagado'].includes(paymentStatus)) {
+      const pdfService = new GenerateInvoicePdfService();
+      pdfService.generateAndSave(affiliationId, month, year, agencyId).catch((err: Error) => {
+        logger.warn('Auto-generation of invoice PDF failed (non-blocking)', {
+          affiliationId, month, year,
+          error: err.message,
+        });
+      });
+    }
+
+    return result;
   }
 }

@@ -9,6 +9,7 @@ import { updateAffiliationStatusController } from './controllers/update-affiliat
 import { closeAffiliationController } from './controllers/close-affiliation.controller.js';
 import { getLatestByClientController } from './controllers/get-latest-by-client.controller.js';
 import { getInvoiceController } from './controllers/get-invoice.controller.js';
+import { generateAllInvoicesController } from './controllers/generate-all-invoices.controller.js';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.get('/daily', getDailyAffiliationsController);
 router.get('/latest-by-client/:clientId', getLatestByClientController);
 router.get('/', getAffiliationsController);
 router.get('/form-data', getFormDataController);
+router.post('/invoices/generate-all', generateAllInvoicesController);
 router.put('/:id', updateAffiliationController);
 router.patch('/:id/status', updateAffiliationStatusController);
 router.patch('/:id/close', closeAffiliationController);

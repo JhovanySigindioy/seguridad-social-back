@@ -3,6 +3,7 @@ import { GenerateInvoicePdfService } from '../services/generate-invoice-pdf.serv
 import logger from '../../../shared/utils/logger.js';
 
 export const getInvoiceController = async (req: Request, res: Response) => {
+  logger.info('getInvoiceController called', { params: req.params, query: req.query });
   try {
     const affiliationId = parseInt(req.params.id as string);
     const month = parseInt(req.query.month as string);
@@ -20,7 +21,11 @@ export const getInvoiceController = async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `inline; filename="factura-${year}-${month.toString().padStart(2, '0')}-${affiliationId}.pdf"`);
     res.send(pdfBuffer);
   } catch (error: any) {
-    logger.error('Error in getInvoiceController', { error });
+    logger.error('Error in getInvoiceController', { 
+      message: error.message,
+      stack: error.stack,
+      name: error.name 
+    });
     res.status(error.status || 500).json({ error: error.message || 'Error generating invoice' });
   }
 };

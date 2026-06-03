@@ -77,9 +77,16 @@ export class UpdateAffiliationService {
     let clientEmployerId: number;
 
     if (!clientEmployerRows.length) {
+      // Fetch the client's office_id
+      const [clientRows]: any = await db.query(
+        `SELECT office_id FROM clients WHERE id = ? LIMIT 1`,
+        [client_id]
+      );
+      const officeId = clientRows[0]?.office_id;
+
       const [insertResult]: any = await db.query(
-        `INSERT INTO client_employers (client_id, company_id) VALUES (?, ?)`,
-        [client_id, company_id]
+        `INSERT INTO client_employers (client_id, company_id, office_id, is_active, start_date) VALUES (?, ?, ?, 1, CURDATE())`,
+        [client_id, company_id, officeId]
       );
       clientEmployerId = insertResult.insertId;
     } else {
