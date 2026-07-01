@@ -100,17 +100,7 @@ export class UpdateAffiliationService {
     const existingAffiliation = await this.getAffiliation(affiliationId, agencyId);
     const endDateValue = end_date || null;
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endDateObj = endDateValue ? new Date(endDateValue) : null;
-    
-    let newStatus: string;
-    if (endDateObj) {
-      endDateObj.setHours(0, 0, 0, 0);
-      newStatus = endDateObj < today ? 'Inactivo' : (existingAffiliation?.status || 'Activo');
-    } else {
-      newStatus = existingAffiliation?.status || 'Activo';
-    }
+    const newStatus = existingAffiliation?.status || 'Activo';
     
     const daysWorked = start_date ? this.calculateDaysWorked(start_date, endDateValue) : null;
 
