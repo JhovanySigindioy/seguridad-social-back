@@ -76,6 +76,7 @@ export class GetAffiliationsService {
         mp.is_auto_renewed,
         a.observation,
         a.withdrawal_reason,
+        a.withdrawal_observations,
         o.name             AS office_name
       FROM affiliations a
         INNER JOIN client_employers ce ON ce.id = a.client_employer_id
@@ -134,6 +135,7 @@ export class GetAffiliationsService {
         mp.is_auto_renewed,
         a.observation,
         a.withdrawal_reason,
+        a.withdrawal_observations,
         o.name             AS office_name
       FROM affiliations a
         INNER JOIN client_employers ce ON ce.id = a.client_employer_id
