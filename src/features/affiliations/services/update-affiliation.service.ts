@@ -18,8 +18,8 @@ interface UpdateAffiliationDTO {
   observation?: string | null;
   withdrawal_reason?: string | null;
   withdrawal_observations?: string | null;
-  month?: number;
-  year?: number;
+  month?: number | undefined;
+  year?: number | undefined;
   gov_record_at?: string | null;
   created_at?: string | null;
   userId: number;
