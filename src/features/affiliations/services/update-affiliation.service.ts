@@ -16,6 +16,8 @@ interface UpdateAffiliationDTO {
   payment_method: string | null;
   is_auto_renewed?: boolean;
   observation?: string | null;
+  withdrawal_reason?: string | null;
+  withdrawal_observations?: string | null;
   month?: number;
   year?: number;
   gov_record_at?: string | null;
@@ -53,6 +55,8 @@ export class UpdateAffiliationService {
       ccf_id, pension_id, risk_level, payment_method, 
       is_auto_renewed, observation 
     } = dto;
+    const withdrawalReason = dto.withdrawal_reason ?? null;
+    const withdrawalObservations = dto.withdrawal_observations ?? null;
 
     const [existing] = await db.query<any[]>(
       `SELECT a.id FROM affiliations a
@@ -126,9 +130,11 @@ export class UpdateAffiliationService {
           ccf_id = ?,
           pension_id = ?,
           risk_level = ?,
-          observation = ?
+          observation = ?,
+          withdrawal_reason = ?,
+          withdrawal_observations = ?
          WHERE id = ?`,
-         [clientEmployerId, start_date ?? null, endDateValue, newStatus, daysWorked ?? null, eps_id, arl_id, ccf_id, pension_id, risk_level, observation || null, affiliationId]
+         [clientEmployerId, start_date ?? null, endDateValue, newStatus, daysWorked ?? null, eps_id, arl_id, ccf_id, pension_id, risk_level, observation || null, withdrawalReason, withdrawalObservations, affiliationId]
       );
 
       // UPSERT payment value for the specific month/year
@@ -162,7 +168,25 @@ export class UpdateAffiliationService {
       throw err;
     }
 
-    return { id: affiliationId, client_employer_id: clientEmployerId, start_date: start_date ?? null, end_date: endDateValue, status: newStatus, days_worked: daysWorked, value, eps_id, arl_id, ccf_id, pension_id, risk_level, payment_method, is_auto_renewed };
+    return {
+      id: affiliationId,
+      client_employer_id: clientEmployerId,
+      start_date: start_date ?? null,
+      end_date: endDateValue,
+      status: newStatus,
+      days_worked: daysWorked,
+      value,
+      eps_id,
+      arl_id,
+      ccf_id,
+      pension_id,
+      risk_level,
+      payment_method,
+      is_auto_renewed,
+      observation: observation || null,
+      withdrawal_reason: withdrawalReason,
+      withdrawal_observations: withdrawalObservations,
+    };
   }
 
   private calculateDaysWorked(start_date: string, end_date: string | null): number {
