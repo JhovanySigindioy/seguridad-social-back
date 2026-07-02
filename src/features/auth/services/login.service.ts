@@ -10,7 +10,8 @@ const ADMIN_ROLE = 'admin';
 export class LoginService {
   async execute(email: string, password: string): Promise<LoginResponse | null> {
     const [users]: any = await pool.query(
-      `SELECT u.id, u.name, u.email, u.password, u.role, u.agency_id, a.logo_url AS agency_logo_url
+      `SELECT u.id, u.name, u.email, u.password, u.role, u.agency_id, a.logo_url AS agency_logo_url,
+              COALESCE(a.is_blocked_for_payment, 0) AS is_blocked_for_payment
        FROM users u
        JOIN agencies a ON a.id = u.agency_id
        WHERE u.email = ? AND u.is_active = 1`,
@@ -27,6 +28,10 @@ export class LoginService {
     logger.info('Password validation', { email, isValid: isPasswordValid });
 
     if (!isPasswordValid) return null;
+
+    if (Boolean(user.is_blocked_for_payment)) {
+      throw Object.assign(new Error('Su acceso a la plataforma se encuentra temporalmente restringido por una novedad administrativa relacionada con el estado de pago.'), { status: 403 });
+    }
 
     let officeIds: number[] = [];
 

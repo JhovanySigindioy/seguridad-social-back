@@ -10,6 +10,7 @@ import affiliationRoutes from './features/affiliations/affiliations.routes.js';
 import clientRoutes from './features/clients/clients.routes.js';
 import companyRoutes from './features/companies/companies.routes.js';
 import dashboardRoutes from './features/dashboard/routes/dashboard.routes.js';
+import publicRoutes from './features/public/public.routes.js';
 import logger from './shared/utils/logger.js';
 import { globalErrorHandler } from './error-handler.js';
 
@@ -22,9 +23,10 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-logger.info('Rutas cargadas: /api/auth, /api/offices, /api/affiliations, /api/clients, /api/companies, /api/dashboard');
+logger.info('Rutas cargadas: /api/auth, /api/public, /api/offices, /api/affiliations, /api/clients, /api/companies, /api/dashboard');
 
 app.use('/api/auth', authRoutes);
+app.use('/api/public', publicRoutes);
 app.use('/api/offices', officeRoutes);
 app.use('/api/affiliations', affiliationRoutes);
 app.use('/api/clients', clientRoutes);
