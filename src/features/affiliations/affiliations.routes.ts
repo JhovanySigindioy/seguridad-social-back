@@ -10,8 +10,6 @@ import { closeAffiliationController } from './controllers/close-affiliation.cont
 import { getLatestByClientController } from './controllers/get-latest-by-client.controller.js';
 import { getInvoiceController } from './controllers/get-invoice.controller.js';
 import { generateAllInvoicesController } from './controllers/generate-all-invoices.controller.js';
-import { renewAffiliationController } from './controllers/renew-affiliation.controller.js';
-import { confirmAffiliationController } from './controllers/confirm-affiliation.controller.js';
 import { rejectAffiliationCandidateController } from './controllers/reject-affiliation-candidate.controller.js';
 
 const router = Router();
@@ -23,8 +21,6 @@ router.get('/latest-by-client/:clientId', getLatestByClientController);
 router.get('/', getAffiliationsController);
 router.get('/form-data', getFormDataController);
 router.post('/invoices/generate-all', generateAllInvoicesController);
-router.post('/:id/renew', renewAffiliationController);
-router.post('/:id/confirm', confirmAffiliationController);
 router.post('/:id/reject-candidate', rejectAffiliationCandidateController);
 router.put('/:id', updateAffiliationController);
 router.patch('/:id/status', updateAffiliationStatusController);
