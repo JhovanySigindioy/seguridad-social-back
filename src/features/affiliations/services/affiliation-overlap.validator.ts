@@ -35,6 +35,16 @@ export class AffiliationOverlapValidator {
       };
     }
 
+    const overlappingPeriods = await this.getOverlappingPeriods(client_employer_id, start_date, end_date);
+    if (overlappingPeriods.length > 0) {
+      const conflictingPeriod = overlappingPeriods[0];
+      return {
+        valid: false,
+        error: 'El cliente ya tiene una afiliación que se cruza con el periodo indicado.',
+        ...(conflictingPeriod ? { conflictingPeriod } : {}),
+      };
+    }
+
     return { valid: true };
   }
 
@@ -45,24 +55,25 @@ export class AffiliationOverlapValidator {
         start_date,
         end_date,
         status
-      FROM affiliations
-      WHERE client_employer_id = ?
-        AND status = 'Activo'
+      FROM affiliations a
+      INNER JOIN client_employers ce ON ce.id = a.client_employer_id
+      INNER JOIN companies co ON co.id = ce.company_id
+      WHERE a.client_employer_id = ?
+        AND co.agency_id = ?
+        AND a.status = 'Activo'
     `;
-    const params: any[] = [client_employer_id];
+    const params: any[] = [client_employer_id, this.agencyId];
 
     if (end_date) {
       query += `
         AND (
-          (start_date <= ? AND (end_date IS NULL OR end_date >= ?))
-          OR (start_date <= ? AND (end_date IS NULL OR end_date >= ?))
-          OR (start_date >= ? AND start_date <= COALESCE(?, '2099-12-31'))
+           (a.start_date <= ? AND (a.end_date IS NULL OR a.end_date >= ?))
         )
       `;
-      params.push(end_date, end_date, end_date, end_date, start_date, end_date);
+      params.push(end_date, start_date);
     } else {
-      query += ` AND start_date <= ? `;
-      params.push(start_date);
+      query += ` AND a.start_date <= ? AND (a.end_date IS NULL OR a.end_date >= ?) `;
+      params.push(start_date, start_date);
     }
 
     const [rows]: any = await db.query(query, params);

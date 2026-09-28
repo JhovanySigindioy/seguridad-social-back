@@ -1,8 +1,14 @@
-export const PAYMENT_STATUSES = ['Pendiente', 'En Proceso', 'Pagado', 'Sin Recibo'] as const;
+export const PAYMENT_STATUSES = ['Pendiente', 'En Proceso', 'Pagado'] as const;
 export type PaymentStatus = typeof PAYMENT_STATUSES[number];
+export const PAYMENT_DISPLAY_STATUSES = [...PAYMENT_STATUSES, 'Por Confirmar'] as const;
+export type PaymentDisplayStatus = typeof PAYMENT_DISPLAY_STATUSES[number];
 
-export const AFFILIATION_STATUSES = ['Activo', 'Inactivo'] as const;
+export const AFFILIATION_STATUSES = ['Activo', 'Inactivo', 'Vencido'] as const;
 export type AffiliationStatus = typeof AFFILIATION_STATUSES[number];
+export const AFFILIATION_DECISION_STATUSES = ['Por Confirmar', 'Confirmada', 'No Continúa'] as const;
+export type AffiliationDecisionStatus = typeof AFFILIATION_DECISION_STATUSES[number];
+export const AFFILIATION_ORIGINS = ['PRIMERA_AFILIACION', 'CONTINUIDAD', 'REINGRESO'] as const;
+export type AffiliationOrigin = typeof AFFILIATION_ORIGINS[number];
 
 export const WITHDRAWAL_REASONS = ['Voluntario', 'FinContrato', 'Licencia', 'Otro'] as const;
 export type WithdrawalReason = typeof WITHDRAWAL_REASONS[number];
@@ -26,7 +32,10 @@ export interface AffiliationItem {
   start_date: string;
   end_date: string | null;
   status: AffiliationStatus;
+  decision_status: AffiliationDecisionStatus;
+  affiliation_origin: AffiliationOrigin;
   days_worked: number | null;
+  monthly_payment_id: number | null;
   month: number;
   year: number;
   value: number;
@@ -35,7 +44,7 @@ export interface AffiliationItem {
   ccf_name: string;
   pension_name: string;
   risk_level: string;
-  payment_status: PaymentStatus;
+  payment_status: PaymentDisplayStatus;
   payment_method: string | null;
   created_at: string;
   gov_record_at: string | null;

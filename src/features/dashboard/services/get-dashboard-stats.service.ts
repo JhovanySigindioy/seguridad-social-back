@@ -36,6 +36,9 @@ export class GetDashboardStatsService {
     const [newAffiliationsRows]: any = await pool.query(
       `SELECT 
         COUNT(a.id) as total,
+        SUM(CASE WHEN mp.payment_status = 'Pagado'
+                  AND a.affiliation_origin IN ('PRIMERA_AFILIACION', 'REINGRESO')
+                 THEN 1 ELSE 0 END) as completed,
         SUM(CASE WHEN mp.payment_status = 'Pagado' THEN 1 ELSE 0 END) as paid,
         SUM(CASE WHEN mp.payment_status = 'Pendiente' THEN 1 ELSE 0 END) as pending,
         SUM(CASE WHEN mp.payment_status = 'En Proceso' THEN 1 ELSE 0 END) as inProcess
@@ -43,7 +46,8 @@ export class GetDashboardStatsService {
       JOIN client_employers ce ON ce.id = a.client_employer_id
       JOIN companies co ON co.id = ce.company_id
       LEFT JOIN monthly_payments mp ON mp.affiliation_id = a.id AND mp.month = ? AND mp.year = ?
-      WHERE ${whereClause} AND a.status = 'Activo' AND MONTH(a.created_at) = ? AND YEAR(a.created_at) = ?`,
+       WHERE ${whereClause} AND a.status = 'Activo' AND a.decision_status = 'Confirmada'
+         AND MONTH(a.start_date) = ? AND YEAR(a.start_date) = ?`,
       [currentMonth, currentYear, ...baseParams, currentMonth, currentYear]
     );
 
@@ -56,7 +60,8 @@ export class GetDashboardStatsService {
       JOIN affiliations a ON a.id = mp.affiliation_id
       JOIN client_employers ce ON ce.id = a.client_employer_id
       JOIN companies co ON co.id = ce.company_id
-      WHERE ${whereClause} AND a.status = 'Activo' AND mp.month = ? AND mp.year = ?`,
+       WHERE ${whereClause} AND a.status = 'Activo' AND a.decision_status = 'Confirmada'
+         AND mp.month = ? AND mp.year = ?`,
       [...baseParams, currentMonth, currentYear]
     );
 
@@ -71,8 +76,9 @@ export class GetDashboardStatsService {
       JOIN client_employers ce ON ce.id = a.client_employer_id
       JOIN companies co ON co.id = ce.company_id
       JOIN monthly_payments mp ON mp.affiliation_id = a.id
-      WHERE ${whereClause} 
-        AND a.end_date < CURDATE() 
+       WHERE ${whereClause} 
+         AND a.status = 'Activo' AND a.decision_status = 'Confirmada'
+         AND a.end_date < CURDATE() 
         AND mp.payment_status != 'Pagado'
         AND mp.id = (SELECT MAX(id) FROM monthly_payments WHERE affiliation_id = a.id)`,
       baseParams
@@ -85,7 +91,7 @@ export class GetDashboardStatsService {
       `SELECT 
         MONTH(COALESCE(mp.created_at, a.created_at)) as month,
         YEAR(COALESCE(mp.created_at, a.created_at)) as year,
-        SUM(CASE WHEN mp.payment_status != 'Pendiente' THEN mp.value ELSE 0 END) as value,
+         SUM(CASE WHEN mp.payment_status = 'Pagado' THEN mp.value ELSE 0 END) as value,
         COUNT(*) as count,
         SUM(CASE WHEN mp.payment_status = 'Pagado' THEN 1 ELSE 0 END) as paid,
         SUM(CASE WHEN mp.payment_status = 'Pendiente' THEN 1 ELSE 0 END) as pending
@@ -93,8 +99,9 @@ export class GetDashboardStatsService {
       JOIN affiliations a ON a.id = mp.affiliation_id
       JOIN client_employers ce ON ce.id = a.client_employer_id
       JOIN companies co ON co.id = ce.company_id
-      WHERE ${whereClause} 
-        AND COALESCE(mp.created_at, a.created_at) >= DATE_SUB(STR_TO_DATE(CONCAT(?, '-', ?, '-01'), '%Y-%m-%d'), INTERVAL 5 MONTH)
+       WHERE ${whereClause} 
+         AND a.status = 'Activo' AND a.decision_status = 'Confirmada'
+         AND COALESCE(mp.created_at, a.created_at) >= DATE_SUB(STR_TO_DATE(CONCAT(?, '-', ?, '-01'), '%Y-%m-%d'), INTERVAL 5 MONTH)
         AND DATE(COALESCE(mp.created_at, a.created_at)) <= LAST_DAY(STR_TO_DATE(CONCAT(?, '-', ?, '-01'), '%Y-%m-%d'))
       GROUP BY year, month
       ORDER BY year DESC, month DESC`,
@@ -114,6 +121,7 @@ export class GetDashboardStatsService {
     return {
       currentMonth: {
         total: Number(newAffiliationsRows[0]?.total || 0),
+        completed: Number(newAffiliationsRows[0]?.completed || 0),
         paid: Number(newAffiliationsRows[0]?.paid || 0),
         pending: Number(newAffiliationsRows[0]?.pending || 0),
         inProcess: Number(newAffiliationsRows[0]?.inProcess || 0)

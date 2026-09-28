@@ -19,7 +19,7 @@ const service = new CloseAffiliationService();
 export const closeAffiliationController = asyncHandler(async (req, res) => {
   const { id } = paramsSchema.parse(req.params);
   const { end_date, withdrawal_reason, withdrawal_observations } = bodySchema.parse(req.body);
-  const { agency_id } = (req as AuthRequest).user;
+  const { agency_id, id: createdBy } = (req as AuthRequest).user;
 
   const data = await service.execute({
     affiliationId: id,
@@ -27,6 +27,7 @@ export const closeAffiliationController = asyncHandler(async (req, res) => {
     withdrawalReason: withdrawal_reason,
     withdrawalObservations: withdrawal_observations ?? undefined,
     agencyId: agency_id,
+    createdBy,
   });
 
   return sendSuccess(res, data);

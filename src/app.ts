@@ -11,6 +11,9 @@ import clientRoutes from './features/clients/clients.routes.js';
 import companyRoutes from './features/companies/companies.routes.js';
 import dashboardRoutes from './features/dashboard/routes/dashboard.routes.js';
 import publicRoutes from './features/public/public.routes.js';
+import affiliateDocumentRoutes from './features/affiliate-documents/affiliate-documents.routes.js';
+import affiliateAuthRoutes from './features/affiliate-auth/affiliate-auth.routes.js';
+import affiliatePortalRoutes from './features/affiliate-portal/affiliate-portal.routes.js';
 import logger from './shared/utils/logger.js';
 import { globalErrorHandler } from './error-handler.js';
 
@@ -23,15 +26,18 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-logger.info('Rutas cargadas: /api/auth, /api/public, /api/offices, /api/affiliations, /api/clients, /api/companies, /api/dashboard');
+logger.info('Rutas cargadas: /api/auth, /api/affiliate/auth, /api/affiliate, /api/public, /api/offices, /api/affiliations, /api/clients, /api/companies, /api/dashboard, /api/affiliate-documents');
 
 app.use('/api/auth', authRoutes);
+app.use('/api/affiliate/auth', affiliateAuthRoutes);
+app.use('/api/affiliate', affiliatePortalRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/offices', officeRoutes);
 app.use('/api/affiliations', affiliationRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/affiliate-documents', affiliateDocumentRoutes);
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ success: true, data: { status: 'vibe-coding-active', timestamp: new Date() }, error: null });

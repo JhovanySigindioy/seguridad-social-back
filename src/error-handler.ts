@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import logger from './shared/utils/logger.js';
 
 const MYSQL_DUPLICATE_ENTRY = 1062;
@@ -93,6 +94,18 @@ export const globalErrorHandler = (
       success: false,
       data: null,
       error: err.message || 'No tienes permisos para realizar esta acción.',
+    });
+  }
+
+  if (err instanceof multer.MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'El archivo excede el tamaño maximo permitido.'
+      : 'No fue posible procesar el archivo adjunto.';
+
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: message,
     });
   }
 

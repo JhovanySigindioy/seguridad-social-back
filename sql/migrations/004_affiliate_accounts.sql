@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS affiliate_accounts (
+  id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  agency_id BIGINT(20) UNSIGNED NOT NULL,
+  client_id BIGINT(20) UNSIGNED NOT NULL,
+  office_id BIGINT(20) UNSIGNED NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  status ENUM('invited', 'active', 'blocked', 'disabled') NOT NULL DEFAULT 'active',
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0,
+  last_login_at TIMESTAMP(6) NULL DEFAULT NULL,
+  created_by_user_id BIGINT(20) UNSIGNED NOT NULL,
+  created_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_affiliate_accounts_email (email),
+  UNIQUE KEY uk_affiliate_accounts_client (client_id),
+  KEY idx_affiliate_accounts_agency (agency_id, office_id),
+  CONSTRAINT fk_affiliate_accounts_agency FOREIGN KEY (agency_id) REFERENCES agencies (id),
+  CONSTRAINT fk_affiliate_accounts_client FOREIGN KEY (client_id) REFERENCES clients (id),
+  CONSTRAINT fk_affiliate_accounts_office FOREIGN KEY (office_id) REFERENCES offices (id),
+  CONSTRAINT fk_affiliate_accounts_created_by FOREIGN KEY (created_by_user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

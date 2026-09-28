@@ -2,19 +2,12 @@ import PDFDocument from 'pdfkit';
 import pool from '../../../config/database.js';
 import logger from '../../../shared/utils/logger.js';
 import { resolve } from 'path';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { storageService } from '../../../shared/storage/storage.service.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getInvoiceFilePath(affiliationId: number, month: number, year: number): string {
-  return resolve(process.cwd(), 'uploads', 'invoices', `invoice-${affiliationId}-${year}-${String(month).padStart(2, '0')}.pdf`);
-}
-
-function ensureInvoicesDir(): void {
-  const dir = resolve(process.cwd(), 'uploads', 'invoices');
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
+function getInvoiceStorageKey(affiliationId: number, month: number, year: number): string {
+  return `invoices/invoice-${affiliationId}-${year}-${String(month).padStart(2, '0')}.pdf`;
 }
 
 function formatCurrency(val: number): string {
@@ -43,14 +36,15 @@ export class GenerateInvoicePdfService {
    * If not → generates lazily, saves, then serves.
    */
   async execute(affiliationId: number, month: number, year: number, agencyId: number): Promise<Buffer> {
-    const filePath = getInvoiceFilePath(affiliationId, month, year);
+    const storageKey = getInvoiceStorageKey(affiliationId, month, year);
+    const metadata = await storageService.provider.headObject(storageKey);
 
-    if (existsSync(filePath)) {
-      logger.info('Serving existing invoice PDF from disk', { affiliationId, month, year });
-      return readFileSync(filePath);
+    if (metadata.exists) {
+      logger.info('Serving existing invoice PDF from storage', { affiliationId, month, year, storageKey });
+      return storageService.provider.getObjectBuffer(storageKey);
     }
 
-    logger.info('Invoice not on disk, generating lazily', { affiliationId, month, year });
+    logger.info('Invoice not in storage, generating lazily', { affiliationId, month, year, storageKey });
     return this.generateAndSave(affiliationId, month, year, agencyId);
   }
 
@@ -58,9 +52,10 @@ export class GenerateInvoicePdfService {
    * Checks if invoice exists, if not generates it. Returns true if it already existed.
    */
   async executeWithCheck(affiliationId: number, month: number, year: number, agencyId: number): Promise<boolean> {
-    const filePath = getInvoiceFilePath(affiliationId, month, year);
+    const storageKey = getInvoiceStorageKey(affiliationId, month, year);
+    const metadata = await storageService.provider.headObject(storageKey);
 
-    if (existsSync(filePath)) {
+    if (metadata.exists) {
       return true;
     }
 
@@ -78,10 +73,19 @@ export class GenerateInvoicePdfService {
     const data = await this.fetchAffiliationData(affiliationId, month, year, agencyId);
     const pdfBuffer = await this.buildPdf(data);
 
-    ensureInvoicesDir();
-    const filePath = getInvoiceFilePath(affiliationId, month, year);
-    writeFileSync(filePath, pdfBuffer);
-    logger.info('Invoice PDF saved', { filePath });
+    const storageKey = getInvoiceStorageKey(affiliationId, month, year);
+    await storageService.provider.putObject({
+      key: storageKey,
+      body: pdfBuffer,
+      contentType: 'application/pdf',
+      metadata: {
+        affiliationId: String(affiliationId),
+        agencyId: String(agencyId),
+        month: String(month),
+        year: String(year),
+      },
+    });
+    logger.info('Invoice PDF saved', { storageKey });
 
     return pdfBuffer;
   }

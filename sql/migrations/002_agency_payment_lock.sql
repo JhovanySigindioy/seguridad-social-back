@@ -1,2 +1,2 @@
 ALTER TABLE agencies
-ADD COLUMN is_blocked_for_payment TINYINT(1) NOT NULL DEFAULT 0;
+ADD COLUMN IF NOT EXISTS is_blocked_for_payment TINYINT(1) NOT NULL DEFAULT 0;

@@ -1,17 +1,23 @@
 import mysql from 'mysql2/promise';
 
+const requiredEnv = (name: string): string => {
+  const value = process.env[name];
+  if (!value) throw new Error(`Falta la variable ${name}`);
+  return value;
+};
+
 const DEST = {
-  host: '82.197.82.132',
-  user: 'u311745467_socialsecurity',
-  password: 'HOst123*',
-  database: 'u311745467_socialsecurity',
+  host: requiredEnv('MIGRATION_DEST_HOST'),
+  user: requiredEnv('MIGRATION_DEST_USER'),
+  password: requiredEnv('MIGRATION_DEST_PASSWORD'),
+  database: requiredEnv('MIGRATION_DEST_NAME'),
 };
 
 const ORIG = {
-  host: 'srv1779.hstgr.io',
-  user: 'u311745467_construvida',
-  password: 'aAJ605R$',
-  database: 'u311745467_construvida',
+  host: requiredEnv('MIGRATION_ORIG_HOST'),
+  user: requiredEnv('MIGRATION_ORIG_USER'),
+  password: requiredEnv('MIGRATION_ORIG_PASSWORD'),
+  database: requiredEnv('MIGRATION_ORIG_NAME'),
 };
 
 type Conn = mysql.Connection;

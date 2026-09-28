@@ -28,6 +28,8 @@ interface UpdateAffiliationDTO {
 interface ExistingAffiliation {
   id: number;
   client_employer_id: number;
+  client_id: number;
+  company_id: number;
   start_date: string;
   end_date: string | null;
   status: string;
@@ -36,7 +38,8 @@ interface ExistingAffiliation {
 export class UpdateAffiliationService {
   async getAffiliation(affiliationId: number, agencyId: number): Promise<ExistingAffiliation | null> {
     const [rows]: any = await db.query(
-      `SELECT a.id, a.client_employer_id, a.start_date, a.end_date, a.status
+      `SELECT a.id, a.client_employer_id, ce.client_id, ce.company_id,
+              a.start_date, a.end_date, a.status
        FROM affiliations a
        INNER JOIN client_employers ce ON ce.id = a.client_employer_id
        INNER JOIN companies co ON co.id = ce.company_id
@@ -71,33 +74,16 @@ export class UpdateAffiliationService {
       throw Object.assign(new Error('Afiliación no encontrada'), { status: 404 });
     }
 
-    let [clientEmployerRows] = await db.query<any[]>(
-      `SELECT ce.id FROM client_employers ce
-       WHERE ce.client_id = ? AND ce.company_id = ?
-       LIMIT 1`,
-      [client_id, company_id]
-    );
-
-    let clientEmployerId: number;
-
-    if (!clientEmployerRows.length) {
-      // Fetch the client's office_id
-      const [clientRows]: any = await db.query(
-        `SELECT office_id FROM clients WHERE id = ? LIMIT 1`,
-        [client_id]
-      );
-      const officeId = clientRows[0]?.office_id;
-
-      const [insertResult]: any = await db.query(
-        `INSERT INTO client_employers (client_id, company_id, office_id, is_active, start_date) VALUES (?, ?, ?, 1, CURDATE())`,
-        [client_id, company_id, officeId]
-      );
-      clientEmployerId = insertResult.insertId;
-    } else {
-      clientEmployerId = clientEmployerRows[0].id;
+    const existingAffiliation = await this.getAffiliation(affiliationId, agencyId);
+    if (!existingAffiliation) {
+      throw Object.assign(new Error('Afiliación no encontrada'), { status: 404 });
+    }
+    if (existingAffiliation.client_id !== client_id || existingAffiliation.company_id !== company_id) {
+      throw Object.assign(new Error('No se puede cambiar el cliente o la empresa de una afiliación existente.'), { status: 409 });
     }
 
-    const existingAffiliation = await this.getAffiliation(affiliationId, agencyId);
+    const clientEmployerId = existingAffiliation.client_employer_id;
+
     const endDateValue = end_date || null;
     
     const newStatus = existingAffiliation?.status || 'Activo';
@@ -142,10 +128,10 @@ export class UpdateAffiliationService {
             payment_method = VALUES(payment_method),
             is_auto_renewed = VALUES(is_auto_renewed),
             gov_record_at = IF(VALUES(gov_record_at) IS NOT NULL, VALUES(gov_record_at), gov_record_at),
-            created_at = IF(VALUES(created_at) IS NOT NULL, VALUES(created_at), created_at)`,
+             created_at = created_at`,
           [
             affiliationId, targetMonth, targetYear, value, payment_method, is_auto_renewed ? 1 : 0, dto.userId,
-            dto.gov_record_at || null, dto.created_at || null
+             null, null
           ]
         );
       }

@@ -31,6 +31,39 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
 
   const clientOfficeId = validClient[0].office_id;
 
+  const [history]: any = await db.query(
+    `SELECT
+       COUNT(*) AS total_affiliations,
+       MAX(
+         a.status = 'Inactivo'
+         OR EXISTS (
+           SELECT 1
+           FROM client_employer_status_history h
+           INNER JOIN client_employers hce ON hce.id = h.client_employer_id
+           INNER JOIN companies hco ON hco.id = hce.company_id
+           WHERE hce.client_id = ce.client_id
+             AND hco.agency_id = co.agency_id
+             AND h.status = 'Retirado'
+         )
+       ) AS has_withdrawal,
+       MAX(
+         a.status = 'Activo'
+         AND a.decision_status = 'Confirmada'
+         AND (a.end_date IS NULL OR a.end_date >= CURRENT_DATE)
+       ) AS has_active_coverage
+     FROM affiliations a
+     INNER JOIN client_employers ce ON ce.id = a.client_employer_id
+     INNER JOIN companies co ON co.id = ce.company_id
+     WHERE ce.client_id = ? AND co.agency_id = ?`,
+    [data.client_id, agencyId]
+  );
+
+  const affiliationOrigin = Number(history[0]?.total_affiliations || 0) === 0
+    ? 'PRIMERA_AFILIACION'
+    : Number(history[0]?.has_withdrawal || 0) === 1 && Number(history[0]?.has_active_coverage || 0) === 0
+      ? 'REINGRESO'
+      : 'CONTINUIDAD';
+
   const [validCompany]: any = await db.query(
     `SELECT id FROM companies WHERE id = ? AND agency_id = ? AND is_active = 1`,
     [data.company_id, agencyId]
@@ -96,16 +129,17 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
     try {
       const [result]: any = await connection.query(
         `INSERT INTO affiliations (
-           client_employer_id, start_date, end_date, status,
+           client_employer_id, start_date, end_date, status, decision_status, affiliation_origin,
            days_worked, eps_id, arl_id, ccf_id, pension_id,
            risk_level, created_by, observation
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, 'Activo', 'Confirmada', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           clientEmployerId,
           start_date,
           end_date,
           'Activo',
-          daysWorked,
+           daysWorked,
+           affiliationOrigin,
           data.eps_id || null,
           data.arl_id || null,
           data.ccf_id || null,
