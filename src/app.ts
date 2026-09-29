@@ -14,6 +14,7 @@ import publicRoutes from './features/public/public.routes.js';
 import affiliateDocumentRoutes from './features/affiliate-documents/affiliate-documents.routes.js';
 import affiliateAuthRoutes from './features/affiliate-auth/affiliate-auth.routes.js';
 import affiliatePortalRoutes from './features/affiliate-portal/affiliate-portal.routes.js';
+import affiliateAccountRoutes from './features/affiliate-accounts/affiliate-accounts.routes.js';
 import logger from './shared/utils/logger.js';
 import { globalErrorHandler } from './error-handler.js';
 
@@ -38,6 +39,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/affiliate-documents', affiliateDocumentRoutes);
+app.use('/api/affiliate-accounts', affiliateAccountRoutes);
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ success: true, data: { status: 'vibe-coding-active', timestamp: new Date() }, error: null });

@@ -9,5 +9,6 @@ export interface AffiliateAuthRequest extends Request {
     name: string;
     role: 'affiliate';
     scope: 'affiliate';
+    must_change_password: boolean;
   };
 }

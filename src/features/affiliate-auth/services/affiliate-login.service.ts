@@ -13,6 +13,7 @@ const buildAffiliateUser = (row: any): AffiliateAuthUser => ({
   agency_id: Number(row.agency_id),
   office_name: row.office_name,
   identification: row.identification,
+  must_change_password: Boolean(row.must_change_password),
 });
 
 export class AffiliateLoginService {
@@ -23,8 +24,9 @@ export class AffiliateLoginService {
          aa.client_id,
          aa.email,
          aa.password_hash,
-         aa.status,
-         aa.agency_id,
+          aa.status,
+          aa.agency_id,
+          aa.must_change_password,
          c.identification,
          CONCAT_WS(' ', c.first_name, c.second_name, c.first_lastname, c.second_lastname) AS client_name,
          o.name AS office_name
@@ -82,6 +84,7 @@ export class AffiliateLoginService {
          aa.client_id,
          aa.email,
          aa.agency_id,
+         aa.must_change_password,
          c.identification,
          CONCAT_WS(' ', c.first_name, c.second_name, c.first_lastname, c.second_lastname) AS client_name,
          o.name AS office_name
