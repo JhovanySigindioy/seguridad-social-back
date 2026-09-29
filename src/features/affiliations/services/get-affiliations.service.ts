@@ -158,7 +158,9 @@ export class GetAffiliationsService {
         LEFT  JOIN ccf_list         cc ON cc.id = a.ccf_id
         LEFT  JOIN pension_fund_list p ON p.id  = a.pension_id
         LEFT  JOIN monthly_payments mp ON mp.affiliation_id = a.id
-      WHERE ce.client_id = ? AND co.agency_id = ?
+       WHERE ce.client_id = ? AND co.agency_id = ?
+         AND a.decision_status = 'Confirmada'
+         AND a.status <> 'Inactivo'
       ORDER BY a.start_date DESC, mp.year DESC, mp.month DESC
       LIMIT 200`,
       [clientId, agencyId]

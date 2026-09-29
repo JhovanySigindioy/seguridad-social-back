@@ -20,11 +20,13 @@ export class GetAffiliatePortalDocumentsService {
          mp.month AS payment_month,
          mp.year AS payment_year,
          '/api/affiliate/documents/' AS base_download_url
-       FROM affiliate_documents d
-       LEFT JOIN monthly_payments mp ON mp.id = d.monthly_payment_id
+        FROM affiliate_documents d
+        LEFT JOIN monthly_payments mp ON mp.id = d.monthly_payment_id
+        LEFT JOIN affiliations linked_a ON linked_a.id = d.affiliation_id
        WHERE d.client_id = ?
          AND d.agency_id = ?
-         AND d.is_visible_to_affiliate = 1
+          AND d.is_visible_to_affiliate = 1
+          AND (d.affiliation_id IS NULL OR linked_a.decision_status = 'Confirmada')
        ORDER BY COALESCE(mp.year, 0) DESC, COALESCE(mp.month, 0) DESC, d.created_at DESC, d.id DESC`,
       [clientId, agencyId]
     );
