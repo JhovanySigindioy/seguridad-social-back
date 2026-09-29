@@ -9,6 +9,8 @@ const querySchema = z.object({
   search: z.string().trim().max(120).optional(),
   status: z.enum(['active', 'blocked', 'disabled', 'invited', 'none']).optional(),
   paid_only: z.enum(['true', 'false']).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  page_size: z.coerce.number().int().min(10).max(100).optional(),
 });
 
 const service = new GetAffiliateAccountsService();
@@ -24,6 +26,8 @@ export const getAffiliateAccountsController = asyncHandler(async (req, res) => {
     ...(query.search ? { search: query.search } : {}),
     ...(query.status ? { status: query.status } : {}),
     paidOnly: query.paid_only === 'true',
+    ...(query.page ? { page: query.page } : {}),
+    ...(query.page_size ? { pageSize: query.page_size } : {}),
   });
   return sendSuccess(res, result);
 });

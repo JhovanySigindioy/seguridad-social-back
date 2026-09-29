@@ -10,7 +10,7 @@ const scopedOfficeCondition = (role: string, userId: number, column: string) => 
 };
 
 export class GetAffiliateAccountsService {
-  async execute({ agencyId, userId, role, officeId, search, status, paidOnly }: AffiliateAccountListFilters) {
+  async execute({ agencyId, userId, role, officeId, search, status, paidOnly, page = 1, pageSize = 25 }: AffiliateAccountListFilters) {
     if (!['admin', 'office_manager', 'viewer'].includes(role)) {
       throw Object.assign(new Error('No tienes permiso para consultar accesos del portal.'), { status: 403 });
     }
@@ -67,6 +67,30 @@ export class GetAffiliateAccountsService {
       )`);
     }
 
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.min(100, Math.max(10, pageSize));
+    const offset = (safePage - 1) * safePageSize;
+
+    const [summaryRows]: any = await db.query(
+      `SELECT
+         COUNT(*) AS total_items,
+         SUM(aa.status = 'active') AS active_accounts,
+         SUM(aa.id IS NULL) AS clients_without_account,
+         SUM(EXISTS (
+           SELECT 1
+           FROM affiliations active_a
+           INNER JOIN client_employers active_ce ON active_ce.id = active_a.client_employer_id
+           WHERE active_ce.client_id = c.id
+             AND active_a.status = 'Activo'
+             AND active_a.decision_status = 'Confirmada'
+         )) AS clients_with_active_affiliation
+       FROM clients c
+       INNER JOIN offices o ON o.id = c.office_id
+       LEFT JOIN affiliate_accounts aa ON aa.client_id = c.id
+       WHERE ${conditions.join(' AND ')}`,
+      params
+    );
+
     const [rows]: any = await db.query(
       `SELECT
          c.id AS client_id,
@@ -89,7 +113,15 @@ export class GetAffiliateAccountsService {
            WHERE client_ce.client_id = c.id
              AND client_a.status = 'Activo'
              AND client_a.decision_status = 'Confirmada'
-         ) AS confirmed_affiliation_count,
+          ) AS confirmed_affiliation_count,
+          (
+            SELECT COUNT(*)
+            FROM affiliations active_client_a
+            INNER JOIN client_employers active_client_ce ON active_client_ce.id = active_client_a.client_employer_id
+            WHERE active_client_ce.client_id = c.id
+              AND active_client_a.status = 'Activo'
+              AND active_client_a.decision_status = 'Confirmada'
+          ) AS active_affiliation_count,
          (
            SELECT COUNT(*)
            FROM affiliate_documents documents
@@ -124,30 +156,48 @@ export class GetAffiliateAccountsService {
        LEFT JOIN affiliate_accounts aa ON aa.client_id = c.id
        LEFT JOIN users creator ON creator.id = aa.created_by_user_id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY (aa.id IS NULL) DESC, c.first_name ASC, c.first_lastname ASC
-       LIMIT 1000`,
-      params
-    );
+        ORDER BY (aa.id IS NULL) DESC, c.first_name ASC, c.first_lastname ASC, c.id ASC
+        LIMIT ? OFFSET ?`,
+       [...params, safePageSize, offset]
+     );
 
-    return rows.map((row: any) => ({
-      client_id: Number(row.client_id),
-      client_name: row.client_name,
-      identification: row.identification,
-      client_email: row.client_email,
-      phone_1: row.phone_1,
-      office_id: Number(row.office_id),
-      office_name: row.office_name,
-      account_id: row.account_id ? Number(row.account_id) : null,
-      account_email: row.account_email,
-      account_status: row.account_status,
-      account_created_at: row.account_created_at,
-      last_login_at: row.last_login_at,
-      created_by_name: row.created_by_name,
-      confirmed_affiliation_count: Number(row.confirmed_affiliation_count || 0),
-      document_count: Number(row.document_count || 0),
-      last_paid_month: row.last_paid_month ? Number(row.last_paid_month) : null,
-      last_paid_year: row.last_paid_year ? Number(row.last_paid_year) : null,
-      eligible: Number(row.confirmed_affiliation_count || 0) > 0 && Boolean(row.last_paid_month),
-    }));
+     const summary = summaryRows[0] || {};
+     const totalItems = Number(summary.total_items || 0);
+
+     return {
+       items: rows.map((row: any) => ({
+         client_id: Number(row.client_id),
+         client_name: row.client_name,
+         identification: row.identification,
+         client_email: row.client_email,
+         phone_1: row.phone_1,
+         office_id: Number(row.office_id),
+         office_name: row.office_name,
+         account_id: row.account_id ? Number(row.account_id) : null,
+         account_email: row.account_email,
+         account_status: row.account_status,
+         account_created_at: row.account_created_at,
+         last_login_at: row.last_login_at,
+         created_by_name: row.created_by_name,
+         confirmed_affiliation_count: Number(row.confirmed_affiliation_count || 0),
+         active_affiliation_count: Number(row.active_affiliation_count || 0),
+         document_count: Number(row.document_count || 0),
+         last_paid_month: row.last_paid_month ? Number(row.last_paid_month) : null,
+         last_paid_year: row.last_paid_year ? Number(row.last_paid_year) : null,
+         eligible: Number(row.active_affiliation_count || 0) > 0,
+       })),
+       pagination: {
+         page: safePage,
+         pageSize: safePageSize,
+         totalItems,
+         totalPages: Math.ceil(totalItems / safePageSize),
+       },
+       summary: {
+         total: totalItems,
+         activeAccounts: Number(summary.active_accounts || 0),
+         clientsWithoutAccount: Number(summary.clients_without_account || 0),
+         clientsWithActiveAffiliation: Number(summary.clients_with_active_affiliation || 0),
+       },
+     };
   }
 }

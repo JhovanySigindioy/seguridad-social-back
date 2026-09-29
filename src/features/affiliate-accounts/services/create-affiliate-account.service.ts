@@ -36,22 +36,6 @@ export class CreateAffiliateAccountService {
     }
 
     const client = clientRows[0];
-    const [eligibilityRows]: any = await db.query(
-      `SELECT COUNT(*) AS paid_count
-       FROM affiliations a
-       INNER JOIN client_employers ce ON ce.id = a.client_employer_id
-       INNER JOIN monthly_payments mp ON mp.affiliation_id = a.id
-       WHERE ce.client_id = ?
-         AND a.status = 'Activo'
-         AND a.decision_status = 'Confirmada'
-         AND mp.payment_status = 'Pagado'`,
-      [clientId]
-    );
-
-    if (Number(eligibilityRows[0]?.paid_count || 0) === 0) {
-      throw Object.assign(new Error('El cliente debe tener al menos un periodo confirmado y pagado para crear el acceso.'), { status: 409 });
-    }
-
     const [existingRows]: any = await db.query(
       'SELECT id FROM affiliate_accounts WHERE client_id = ? LIMIT 1',
       [clientId]

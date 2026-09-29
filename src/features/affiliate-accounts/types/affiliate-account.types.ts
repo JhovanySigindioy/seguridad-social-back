@@ -6,6 +6,8 @@ export interface AffiliateAccountListFilters {
   search?: string;
   status?: 'active' | 'blocked' | 'disabled' | 'invited' | 'none';
   paidOnly?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CreateAffiliateAccountInput {

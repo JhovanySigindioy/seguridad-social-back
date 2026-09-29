@@ -33,7 +33,17 @@ export class AffiliateLoginService {
        FROM affiliate_accounts aa
        INNER JOIN clients c ON c.id = aa.client_id
        INNER JOIN offices o ON o.id = aa.office_id
-       WHERE aa.email = ?
+        WHERE aa.email = ?
+          AND EXISTS (
+            SELECT 1
+            FROM affiliations active_a
+            INNER JOIN client_employers active_ce ON active_ce.id = active_a.client_employer_id
+            INNER JOIN offices active_o ON active_o.id = active_ce.office_id
+            WHERE active_ce.client_id = aa.client_id
+              AND active_o.agency_id = aa.agency_id
+              AND active_a.status = 'Activo'
+              AND active_a.decision_status = 'Confirmada'
+          )
        LIMIT 1`,
       [email]
     );
@@ -91,7 +101,17 @@ export class AffiliateLoginService {
        FROM affiliate_accounts aa
        INNER JOIN clients c ON c.id = aa.client_id
        INNER JOIN offices o ON o.id = aa.office_id
-       WHERE aa.id = ? AND aa.status = 'active'
+        WHERE aa.id = ? AND aa.status = 'active'
+          AND EXISTS (
+            SELECT 1
+            FROM affiliations active_a
+            INNER JOIN client_employers active_ce ON active_ce.id = active_a.client_employer_id
+            INNER JOIN offices active_o ON active_o.id = active_ce.office_id
+            WHERE active_ce.client_id = aa.client_id
+              AND active_o.agency_id = aa.agency_id
+              AND active_a.status = 'Activo'
+              AND active_a.decision_status = 'Confirmada'
+          )
        LIMIT 1`,
       [accountId]
     );
