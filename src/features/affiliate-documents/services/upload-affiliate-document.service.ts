@@ -3,6 +3,7 @@ import db from '../../../config/database.js';
 import { storageService } from '../../../shared/storage/storage.service.js';
 import { buildAffiliateDocumentSelect, buildAffiliateDocumentStorageKey, buildOfficeScope, mapAffiliateDocumentRow, assertCanWriteDocuments } from './affiliate-document.helpers.js';
 import type { UploadAffiliateDocumentDTO } from '../types/affiliate-document.types.js';
+import { PortalServiceService } from '../../portal-service/services/portal-service.service.js';
 
 interface UploadAffiliateDocumentInput {
   agencyId: number;
@@ -15,6 +16,7 @@ interface UploadAffiliateDocumentInput {
 export class UploadAffiliateDocumentService {
   async execute({ agencyId, userId, role, payload, file }: UploadAffiliateDocumentInput) {
     assertCanWriteDocuments(role);
+    await new PortalServiceService().assertEnabled(agencyId);
 
     const officeScope = buildOfficeScope(role, userId, 'c.office_id');
     const clientParams: Array<number | string> = [payload.client_id, agencyId, ...officeScope.params];

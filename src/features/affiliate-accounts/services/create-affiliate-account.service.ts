@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import bcryptjs from 'bcryptjs';
 import db from '../../../config/database.js';
 import type { CreateAffiliateAccountInput } from '../types/affiliate-account.types.js';
+import { PortalServiceService } from '../../portal-service/services/portal-service.service.js';
 
 const normalizeEmail = (email?: string) => email?.trim().toLowerCase() || '';
 
@@ -15,6 +16,8 @@ export class CreateAffiliateAccountService {
     if (!['admin', 'office_manager'].includes(role)) {
       throw Object.assign(new Error('Solo administradores y gestores de oficina pueden crear accesos.'), { status: 403 });
     }
+
+    await new PortalServiceService().assertEnabled(agencyId);
 
     const officeScope = role === 'admin' ? { sql: '', params: [] as number[] } : {
       sql: ' AND c.office_id IN (SELECT office_id FROM user_offices WHERE user_id = ?)',
