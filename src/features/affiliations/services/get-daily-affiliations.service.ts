@@ -42,7 +42,11 @@ export class GetDailyAffiliationsService {
   ): Promise<{ items: DailyAffiliationItem[] }> {
     logger.info('Fetching daily affiliations', { agencyId, userId, role, date, officeId });
 
-    const conditions = ['co.agency_id = ?', 'DATE(a.created_at) = ?', "a.status = 'Activo'"];
+    const conditions = [
+      'co.agency_id = ?',
+      "DATE(CONVERT_TZ(a.created_at, '+00:00', '-05:00')) = ?",
+      "a.status = 'Activo'"
+    ];
     const params: any[] = [agencyId, date];
 
     if (role !== 'admin') {

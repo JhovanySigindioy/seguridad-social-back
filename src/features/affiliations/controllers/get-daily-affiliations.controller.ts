@@ -5,11 +5,22 @@ import type { AuthRequest } from '../../../types/express.types.js';
 
 const service = new GetDailyAffiliationsService();
 
+const getBusinessDate = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
 export const getDailyAffiliationsController = asyncHandler(async (req, res) => {
   const { agency_id, id: userId, role } = (req as AuthRequest).user;
 
   const rawDate = req.query.date;
-  const date: string = typeof rawDate === 'string' ? rawDate : new Date().toISOString().split('T')[0]!;
+  const date: string = typeof rawDate === 'string' ? rawDate : getBusinessDate();
   const officeId = req.query.office_id ? parseInt(req.query.office_id as string, 10) : undefined;
 
   const data = await service.execute(agency_id, userId, role, date, officeId);

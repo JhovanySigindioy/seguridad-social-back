@@ -154,8 +154,8 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
       await connection.query(
         `INSERT INTO monthly_payments (
            affiliation_id, month, year, value,
-           payment_status, payment_method, is_auto_renewed, created_by
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           payment_status, payment_method, is_auto_renewed, created_by, received_date
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           affiliationId,
           month,
@@ -163,8 +163,9 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
           data.value,
           'Pendiente',
           data.payment_method || null,
-          data.is_auto_renewed ? 1 : 0,
-          createdBy
+           data.is_auto_renewed ? 1 : 0,
+           createdBy,
+           start_date
         ]
       );
 

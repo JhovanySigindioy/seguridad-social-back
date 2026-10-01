@@ -20,6 +20,7 @@ interface UpdateAffiliationDTO {
   withdrawal_observations?: string | null;
   month?: number | undefined;
   year?: number | undefined;
+  received_date?: string | null;
   gov_record_at?: string | null;
   created_at?: string | null;
   userId: number;
@@ -121,17 +122,18 @@ export class UpdateAffiliationService {
       if (targetMonth && targetYear) {
         await connection.query(
           `INSERT INTO monthly_payments 
-            (affiliation_id, month, year, value, payment_status, payment_method, is_auto_renewed, created_by, gov_record_at, created_at)
-           VALUES (?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?)
+            (affiliation_id, month, year, value, payment_status, payment_method, is_auto_renewed, created_by, gov_record_at, created_at, received_date)
+           VALUES (?, ?, ?, ?, 'Pendiente', ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
             value = VALUES(value),
             payment_method = VALUES(payment_method),
             is_auto_renewed = VALUES(is_auto_renewed),
             gov_record_at = IF(VALUES(gov_record_at) IS NOT NULL, VALUES(gov_record_at), gov_record_at),
-             created_at = created_at`,
+            created_at = IF(VALUES(created_at) IS NOT NULL, VALUES(created_at), created_at),
+            received_date = VALUES(received_date)`,
           [
-            affiliationId, targetMonth, targetYear, value, payment_method, is_auto_renewed ? 1 : 0, dto.userId,
-             null, null
+             affiliationId, targetMonth, targetYear, value, payment_method, is_auto_renewed ? 1 : 0, dto.userId,
+             dto.gov_record_at ?? null, dto.created_at ?? null, dto.received_date ?? null
           ]
         );
       }

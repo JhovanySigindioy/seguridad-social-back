@@ -75,7 +75,7 @@ export class GetAffiliationsService {
               ELSE mp.payment_status END AS payment_status,
         mp.payment_method,
         a.created_at,
-        mp.created_at AS payment_created_at,
+        COALESCE(mp.received_date, DATE(CONVERT_TZ(mp.created_at, '+00:00', '-05:00'))) AS payment_received_date,
         mp.gov_record_at,
         COALESCE(mp.value, (
           SELECT value FROM monthly_payments 
@@ -140,6 +140,7 @@ export class GetAffiliationsService {
               ELSE mp.payment_status END AS payment_status,
         mp.payment_method,
         a.created_at,
+        COALESCE(mp.received_date, DATE(CONVERT_TZ(mp.created_at, '+00:00', '-05:00'))) AS payment_received_date,
         mp.gov_record_at,
         COALESCE(mp.value, (
           SELECT value FROM monthly_payments 

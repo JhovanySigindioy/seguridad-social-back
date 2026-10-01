@@ -47,7 +47,8 @@ export class GetDashboardStatsService {
       JOIN companies co ON co.id = ce.company_id
       LEFT JOIN monthly_payments mp ON mp.affiliation_id = a.id AND mp.month = ? AND mp.year = ?
        WHERE ${whereClause} AND a.status = 'Activo' AND a.decision_status = 'Confirmada'
-         AND MONTH(a.start_date) = ? AND YEAR(a.start_date) = ?`,
+          AND a.affiliation_origin IN ('PRIMERA_AFILIACION', 'REINGRESO')
+          AND MONTH(a.start_date) = ? AND YEAR(a.start_date) = ?`,
       [currentMonth, currentYear, ...baseParams, currentMonth, currentYear]
     );
 

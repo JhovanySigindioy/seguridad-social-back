@@ -24,6 +24,7 @@ const updateSchema = z.object({
   created_at: z.string().nullable().optional(),
   month: z.number().int().positive().optional(),
   year: z.number().int().positive().optional(),
+  received_date: z.string().nullable().optional(),
 });
 
 export const updateAffiliationController = asyncHandler(async (req, res) => {
@@ -45,6 +46,7 @@ export const updateAffiliationController = asyncHandler(async (req, res) => {
     observation: validatedData.observation ?? null,
     withdrawal_reason: validatedData.withdrawal_reason ?? null,
     withdrawal_observations: validatedData.withdrawal_observations ?? null,
+    received_date: validatedData.received_date ?? null,
     gov_record_at: validatedData.gov_record_at ?? null,
     created_at: validatedData.created_at ?? null,
     affiliationId,
