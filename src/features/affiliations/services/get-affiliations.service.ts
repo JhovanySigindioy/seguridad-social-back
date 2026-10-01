@@ -81,7 +81,7 @@ export class GetAffiliationsService {
           SELECT value FROM monthly_payments 
           WHERE affiliation_id = a.id 
           ORDER BY year DESC, month DESC LIMIT 1
-        )) AS value,
+        ), a.proposed_value, 0) AS value,
         mp.is_auto_renewed,
         a.observation,
         a.withdrawal_reason,
@@ -146,7 +146,7 @@ export class GetAffiliationsService {
           SELECT value FROM monthly_payments 
           WHERE affiliation_id = a.id 
           ORDER BY year DESC, month DESC LIMIT 1
-        )) AS value,
+        ), a.proposed_value, 0) AS value,
         mp.is_auto_renewed,
         a.observation,
         a.withdrawal_reason,
