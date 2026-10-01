@@ -134,10 +134,9 @@ export const createAffiliationService = async (data: CreateAffiliationDTO, creat
            risk_level, created_by, observation
          ) VALUES (?, ?, ?, 'Activo', 'Confirmada', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          clientEmployerId,
-          start_date,
-          end_date,
-          'Activo',
+           clientEmployerId,
+           start_date,
+           end_date,
            daysWorked,
            affiliationOrigin,
           data.eps_id || null,

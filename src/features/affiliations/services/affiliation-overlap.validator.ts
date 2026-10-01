@@ -28,10 +28,10 @@ export class AffiliationOverlapValidator {
     const parsedStartDate = new Date(start_date);
     const parsedEndDate = end_date ? new Date(end_date) : null;
 
-    if (parsedEndDate && parsedEndDate <= parsedStartDate) {
+    if (parsedEndDate && parsedEndDate < parsedStartDate) {
       return {
         valid: false,
-        error: 'La fecha de inicio debe ser anterior a la fecha de fin.',
+        error: 'La fecha de fin no puede ser anterior a la fecha de inicio.',
       };
     }
 
@@ -51,10 +51,10 @@ export class AffiliationOverlapValidator {
   async getOverlappingPeriods(client_employer_id: number, start_date: string, end_date?: string | null): Promise<AffiliationPeriod[]> {
     let query = `
       SELECT 
-        id,
-        start_date,
-        end_date,
-        status
+        a.id,
+        a.start_date,
+        a.end_date,
+        a.status
       FROM affiliations a
       INNER JOIN client_employers ce ON ce.id = a.client_employer_id
       INNER JOIN companies co ON co.id = ce.company_id

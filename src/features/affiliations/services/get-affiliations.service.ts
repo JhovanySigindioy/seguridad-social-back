@@ -42,6 +42,11 @@ export class GetAffiliationsService {
 
     logger.debug('Executing query', { sqlParams: params });
     const finalParams = params;
+    const statusSelect = month && year
+      ? 'a.status'
+      : `CASE WHEN a.status = 'Inactivo' THEN 'Inactivo'
+             WHEN a.end_date < CURRENT_DATE THEN 'Vencido'
+             ELSE 'Activo' END`;
 
     const sql = `SELECT
         a.id,
@@ -54,9 +59,7 @@ export class GetAffiliationsService {
         co.name            AS company_name,
         a.start_date,
         a.end_date,
-         CASE WHEN a.status = 'Inactivo' THEN 'Inactivo'
-               WHEN a.end_date < CURRENT_DATE THEN 'Vencido'
-               ELSE 'Activo' END AS status,
+         ${statusSelect} AS status,
          a.decision_status,
          a.affiliation_origin,
          a.days_worked,
