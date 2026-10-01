@@ -5,7 +5,7 @@ import { GenerateInvoicePdfService } from './generate-invoice-pdf.service.js';
 
 const ALLOWED_STATUSES_BY_ROLE: Record<string, PaymentDisplayStatus[]> = {
   admin: ['Por Confirmar', 'Pendiente', 'En Proceso', 'Pagado'],
-  office_manager: ['Por Confirmar', 'Pendiente', 'En Proceso'],
+  office_manager: ['Por Confirmar', 'Pendiente', 'En Proceso', 'Pagado'],
 };
 
 interface UpdateAffiliationStatusDTO {
@@ -65,7 +65,7 @@ export class UpdateAffiliationStatusService {
       throw Object.assign(new Error('Una afiliación marcada como No Continúa no puede recibir pagos.'), { status: 409 });
     }
 
-    if (currentStatus === 'Pagado' && paymentStatus !== 'Pagado') {
+    if (currentStatus === 'Pagado' && !['Pagado', 'En Proceso'].includes(paymentStatus)) {
       throw Object.assign(new Error('Un pago Pagado no puede retroceder a otro estado.'), { status: 409 });
     }
     let govRecordAt = paymentRows[0]?.gov_record_at ?? null;
