@@ -31,6 +31,7 @@ interface ExistingAffiliation {
   client_employer_id: number;
   client_id: number;
   company_id: number;
+  office_id: number;
   start_date: string;
   end_date: string | null;
   status: string;
@@ -39,7 +40,7 @@ interface ExistingAffiliation {
 export class UpdateAffiliationService {
   async getAffiliation(affiliationId: number, agencyId: number): Promise<ExistingAffiliation | null> {
     const [rows]: any = await db.query(
-      `SELECT a.id, a.client_employer_id, ce.client_id, ce.company_id,
+       `SELECT a.id, a.client_employer_id, ce.client_id, ce.company_id, ce.office_id,
               a.start_date, a.end_date, a.status
        FROM affiliations a
        INNER JOIN client_employers ce ON ce.id = a.client_employer_id
@@ -79,22 +80,67 @@ export class UpdateAffiliationService {
     if (!existingAffiliation) {
       throw Object.assign(new Error('Afiliación no encontrada'), { status: 404 });
     }
-    if (existingAffiliation.client_id !== client_id || existingAffiliation.company_id !== company_id) {
-      throw Object.assign(new Error('No se puede cambiar el cliente o la empresa de una afiliación existente.'), { status: 409 });
+    if (existingAffiliation.client_id !== client_id) {
+      throw Object.assign(new Error('No se puede cambiar el cliente de una afiliación existente.'), { status: 409 });
     }
-
-    const clientEmployerId = existingAffiliation.client_employer_id;
 
     const endDateValue = end_date || null;
     
     const newStatus = existingAffiliation?.status || 'Activo';
     
     const daysWorked = start_date ? this.calculateDaysWorked(start_date, endDateValue) : null;
+    let clientEmployerId = existingAffiliation.client_employer_id;
 
     const connection = await db.getConnection();
     await connection.beginTransaction();
 
     try {
+      const [validCompany]: any = await connection.query(
+        `SELECT id FROM companies WHERE id = ? AND agency_id = ? AND is_active = 1 LIMIT 1`,
+        [company_id, agencyId]
+      );
+
+      if (!validCompany.length) {
+        throw Object.assign(new Error('La empresa no existe, está inactiva o no pertenece a la agencia.'), { status: 403 });
+      }
+
+      if (existingAffiliation.company_id !== company_id) {
+        const [matchingEmployers]: any = await connection.query(
+          `SELECT id FROM client_employers
+           WHERE client_id = ? AND company_id = ? AND is_active = 1
+           LIMIT 1`,
+          [client_id, company_id]
+        );
+
+        if (matchingEmployers.length) {
+          clientEmployerId = matchingEmployers[0].id;
+        } else {
+          const [employerResult]: any = await connection.query(
+            `INSERT INTO client_employers
+              (client_id, company_id, office_id, is_active, start_date)
+             VALUES (?, ?, ?, 1, ?)`,
+            [client_id, company_id, existingAffiliation.office_id, start_date ?? new Date().toISOString().slice(0, 10)]
+          );
+          clientEmployerId = employerResult.insertId;
+        }
+
+        const [overlaps]: any = await connection.query(
+          `SELECT a.id
+           FROM affiliations a
+           WHERE a.client_employer_id = ?
+             AND a.id <> ?
+             AND a.status = 'Activo'
+             AND a.start_date <= ?
+             AND (a.end_date IS NULL OR a.end_date >= ?)
+           LIMIT 1`,
+          [clientEmployerId, affiliationId, endDateValue ?? start_date, start_date]
+        );
+
+        if (overlaps.length) {
+          throw Object.assign(new Error('El cliente ya tiene una afiliación activa que se cruza con el periodo en la nueva empresa.'), { status: 409 });
+        }
+      }
+
       await connection.query(
         `UPDATE affiliations SET
           client_employer_id = ?,
