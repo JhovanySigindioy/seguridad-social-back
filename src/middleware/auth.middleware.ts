@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { sendError } from '../shared/utils/api-response.js';
 import { DashboardSessionService, SessionError } from '../features/auth/services/session.service.js';
-import { getDashboardSessionToken } from '../features/auth/services/session-cookie.js';
+import { clearDashboardSessionCookie, getDashboardSessionToken } from '../features/auth/services/session-cookie.js';
 
 const sessionService = new DashboardSessionService();
 
@@ -20,6 +20,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     next();
   } catch (error) {
     if (error instanceof SessionError) {
+      clearDashboardSessionCookie(res);
       return sendError(res, error.message, error.status);
     }
 

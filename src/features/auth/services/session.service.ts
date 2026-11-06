@@ -26,7 +26,7 @@ export class SessionError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly code: 'SESSION_ALREADY_ACTIVE' | 'SESSION_INVALID' | 'SESSION_EXPIRED' | 'SESSION_REVOKED' | 'SESSION_TAB_CONFLICT'
+    public readonly code: 'SESSION_ALREADY_ACTIVE' | 'SESSION_INVALID' | 'SESSION_EXPIRED' | 'SESSION_REVOKED' | 'SESSION_TAB_CONFLICT' | 'AGENCY_PAYMENT_BLOCKED'
   ) {
     super(message);
     this.name = 'SessionError';
@@ -158,9 +158,10 @@ export class DashboardSessionService {
          u.id,
          u.name,
          u.email,
-         u.role,
-         u.agency_id,
-         a.logo_url AS agency_logo_url
+          u.role,
+          u.agency_id,
+          a.logo_url AS agency_logo_url,
+          COALESCE(a.is_blocked_for_payment, 0) AS is_blocked_for_payment
        FROM dashboard_sessions s
        JOIN users u ON u.id = s.user_id
        JOIN agencies a ON a.id = u.agency_id
@@ -176,6 +177,15 @@ export class DashboardSessionService {
     const row = rows[0];
     if (row.revoked_at || row.active_slot !== 1) {
       throw new SessionError('La sesión fue revocada.', 401, 'SESSION_REVOKED');
+    }
+
+    if (Boolean(row.is_blocked_for_payment)) {
+      await this.revokeByHash(tokenHash, 'agency_payment_blocked');
+      throw new SessionError(
+        'El acceso de esta agencia está bloqueado por estado de pago.',
+        401,
+        'AGENCY_PAYMENT_BLOCKED'
+      );
     }
 
     if (new Date(row.expires_at) <= now || new Date(row.last_seen_at) <= inactiveAt) {
