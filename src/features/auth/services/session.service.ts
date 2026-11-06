@@ -81,21 +81,15 @@ export class DashboardSessionService {
 
       await releaseExpiredSession(connection, userId, now, inactiveAt);
 
-      const [activeRows]: any = await connection.query(
-        `SELECT id
-         FROM dashboard_sessions
-         WHERE user_id = ? AND active_slot = 1
-         LIMIT 1`,
+      // A successful re-login replaces an abandoned session instead of locking the user out.
+      await connection.query(
+        `UPDATE dashboard_sessions
+         SET active_slot = NULL,
+             revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP(6)),
+             revoke_reason = COALESCE(revoke_reason, 'replaced_by_new_login')
+         WHERE user_id = ? AND active_slot = 1`,
         [userId]
       );
-
-      if (activeRows.length) {
-        throw new SessionError(
-          'Este usuario ya tiene una sesión activa en otro equipo o pestaña.',
-          409,
-          'SESSION_ALREADY_ACTIVE'
-        );
-      }
 
       const sessionId = randomUUID();
       const token = randomBytes(48).toString('base64url');
