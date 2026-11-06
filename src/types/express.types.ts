@@ -5,6 +5,7 @@ import type { Request } from 'express';
  * El middleware auth.middleware.ts inyecta este objeto en req.user.
  */
 export interface AuthRequest extends Request {
+  sessionId: string;
   user: {
     id: number;
     email: string;

@@ -18,13 +18,24 @@ import affiliateAccountRoutes from './features/affiliate-accounts/affiliate-acco
 import portalServiceRoutes from './features/portal-service/portal-service.routes.js';
 import logger from './shared/utils/logger.js';
 import { globalErrorHandler } from './error-handler.js';
+import { env } from './config/env.js';
 
 dotenv.config();
 
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+const allowedOrigins = env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({
+  credentials: true,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Origin no permitido por CORS'));
+  },
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 

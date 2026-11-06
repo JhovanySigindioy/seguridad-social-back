@@ -1,14 +1,13 @@
 import bcryptjs from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import pool from '../../../config/database.js';
 import logger from '../../../shared/utils/logger.js';
-import { env } from '../../../config/env.js';
 import type { LoginResponse } from '../types/auth.types.js';
+import { DashboardSessionService } from './session.service.js';
 
 const ADMIN_ROLE = 'admin';
 
 export class LoginService {
-  async execute(email: string, password: string): Promise<LoginResponse | null> {
+  async execute(email: string, password: string, tabId: string): Promise<LoginResponse | null> {
     const [users]: any = await pool.query(
       `SELECT u.id, u.name, u.email, u.password, u.role, u.agency_id, a.logo_url AS agency_logo_url,
               COALESCE(a.is_blocked_for_payment, 0) AS is_blocked_for_payment
@@ -24,8 +23,6 @@ export class LoginService {
 
     const user = users[0];
     const isPasswordValid = await bcryptjs.compare(password, user.password);
-
-    logger.info('Password validation', { email, isValid: isPasswordValid });
 
     if (!isPasswordValid) return null;
 
@@ -51,11 +48,8 @@ export class LoginService {
 
     logger.info('Offices resolved', { email, role: user.role, officeCount: officeIds.length });
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, agency_id: user.agency_id },
-      env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
+    const sessionService = new DashboardSessionService();
+    const { token, session } = await sessionService.create(user.id, tabId);
 
     return {
       token,
@@ -68,6 +62,7 @@ export class LoginService {
         agency_logo_url: user.agency_logo_url,
       },
       offices: officeIds,
+      expiresAt: session.expiresAt.toISOString(),
     };
   }
 }

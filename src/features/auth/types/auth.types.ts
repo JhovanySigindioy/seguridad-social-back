@@ -9,4 +9,11 @@ export interface LoginResponse {
     agency_logo_url?: string | null;
   };
   offices: number[];
+  expiresAt: string;
+}
+
+export interface PublicLoginResponse {
+  user: LoginResponse['user'];
+  offices: number[];
+  expiresAt: string;
 }

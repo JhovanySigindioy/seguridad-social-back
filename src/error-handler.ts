@@ -97,6 +97,14 @@ export const globalErrorHandler = (
     });
   }
 
+  if (err.status === 401 || err.status === 409) {
+    return res.status(err.status).json({
+      success: false,
+      data: null,
+      error: err.message || 'No fue posible validar la sesión.',
+    });
+  }
+
   if (err instanceof multer.MulterError) {
     const message = err.code === 'LIMIT_FILE_SIZE'
       ? 'El archivo excede el tamaño maximo permitido.'

@@ -1,22 +1,28 @@
 import type { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { sendError } from '../shared/utils/api-response.js';
-import { env } from '../config/env.js';
+import { DashboardSessionService, SessionError } from '../features/auth/services/session.service.js';
+import { getDashboardSessionToken } from '../features/auth/services/session-cookie.js';
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
+const sessionService = new DashboardSessionService();
 
-  if (!authHeader?.startsWith('Bearer ')) {
-    return sendError(res, 'Token no proporcionado', 401);
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+  const token = getDashboardSessionToken(req);
+  const tabId = req.header('X-Session-Tab-Id');
+
+  if (!token || !tabId) {
+    return sendError(res, 'Sesión administrativa no proporcionada.', 401);
   }
 
-  const token = authHeader.slice('Bearer '.length);
-
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET);
-    (req as any).user = decoded;
+    const session = await sessionService.validate(token, tabId);
+    (req as any).user = session.user;
+    (req as any).sessionId = session.sessionId;
     next();
-  } catch {
-    return sendError(res, 'Token invalido o expirado', 401);
+  } catch (error) {
+    if (error instanceof SessionError) {
+      return sendError(res, error.message, error.status);
+    }
+
+    return next(error);
   }
 };
